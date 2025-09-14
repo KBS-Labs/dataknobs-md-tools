@@ -2,6 +2,7 @@
 *.pdf
 *.html
 !examples/*.md
+!src/templates/*.html
 
 # Temporary files
 *.tmp
