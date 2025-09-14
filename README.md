@@ -11,6 +11,7 @@ Convert Markdown files with Mermaid diagrams to beautiful PDF and HTML documents
 - 🐳 **Docker Support** - Run without installing dependencies
 - 🚀 **Fast & Lightweight** - Efficient conversion pipeline
 - 📚 **Table of Contents** - Auto-generated TOC support
+- 🎯 **Self-Contained HTML** - Embedded images for portable documents
 
 ## Quick Start
 
@@ -23,7 +24,7 @@ docker pull dataknobs/md-tools
 # Convert markdown to PDF
 docker run --rm -v $(pwd):/workspace dataknobs/md-tools input.md output.pdf
 
-# Convert markdown to HTML
+# Convert markdown to HTML (self-contained by default)
 docker run --rm -v $(pwd):/workspace dataknobs/md-tools -f html input.md output.html
 ```
 
@@ -40,7 +41,7 @@ cd dataknobs-md-tools
 # Convert markdown to PDF
 ./bin/dk-md2pdf input.md output.pdf
 
-# Convert markdown to HTML
+# Convert markdown to HTML (self-contained by default)
 ./bin/dk-md2html input.md output.html
 ```
 
@@ -95,35 +96,46 @@ If the installer doesn't support your system:
 dk-md2pdf [OPTIONS] input.md [output]
 ```
 
+**Output Format Auto-Detection**: The tool automatically detects the output format based on file extension:
+- `.html` or `.htm` → HTML output
+- `.pdf` or no extension → PDF output
+- Use `-f` flag to override auto-detection
+
 #### Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
 | `-h, --help` | Show help message | - |
-| `-f, --format` | Output format: `pdf` or `html` | `pdf` |
+| `-f, --format` | Force output format: `pdf` or `html` | auto-detect |
 | `-t, --theme` | CSS theme: `github`, `academic`, `minimal` | `github` |
 | `--toc` | Include table of contents | disabled |
 | `--no-mermaid` | Skip Mermaid diagram processing | disabled |
-| `--standalone` | Create self-contained HTML | disabled |
+| `--standalone` | Create self-contained HTML with embedded CSS | disabled |
+| `--keep-html` | When generating PDF, also save intermediate HTML | disabled |
+| `--keep-svgs` | Keep SVG files as external files (HTML only) | embed in HTML |
 | `-v, --verbose` | Enable verbose output | disabled |
 
 ### Examples
 
 ```bash
-# Basic conversion
-dk-md2pdf README.md
+# Basic conversion (creates input.pdf)
+dk-md2pdf input.md
 
-# Specify output file
-dk-md2pdf input.md output.pdf
+# Auto-detect format from extension
+dk-md2pdf input.md output.html    # Creates HTML
+dk-md2pdf input.md output.pdf     # Creates PDF
 
-# Generate HTML
-dk-md2pdf -f html input.md
+# Generate both PDF and HTML in one run
+dk-md2pdf --keep-html input.md output.pdf
+
+# HTML with external SVG files (not embedded)
+dk-md2pdf --keep-svgs input.md output.html
 
 # Academic style with TOC
 dk-md2pdf -t academic --toc paper.md
 
-# Self-contained HTML
-dk-md2pdf -f html --standalone --toc report.md
+# Self-contained HTML with embedded CSS and images
+dk-md2pdf --standalone --toc report.md report.html
 ```
 
 ### Global Installation
@@ -149,6 +161,29 @@ Professional appearance suitable for papers, reports, and formal documents. Feat
 
 ### Minimal
 Simple, distraction-free design focusing on readability. Ideal for basic documents and printing.
+
+## HTML Output Features
+
+### Self-Contained Documents
+
+By default, HTML output creates fully self-contained documents:
+- **Embedded Images**: All Mermaid diagrams are embedded as base64 data URIs
+- **No External Files**: Single HTML file contains everything
+- **Portable**: Share or email the HTML file without attachments
+- **Clean Directories**: No SVG files cluttering your output folder
+
+To keep SVG files as separate external files (previous behavior):
+```bash
+dk-md2pdf --keep-svgs input.md output.html
+```
+
+### Dual Output Generation
+
+Generate both PDF and HTML in a single command:
+```bash
+dk-md2pdf --keep-html input.md output.pdf
+# Creates: output.pdf and output.html
+```
 
 ## Mermaid Diagram Support
 
@@ -277,6 +312,13 @@ dk-md2pdf -v input.md
 
 ### Mermaid Rendering Issues
 
+**Missing text in diagrams?** Run the font fix:
+```bash
+./native/fix-fonts.sh
+```
+
+For other mermaid issues:
+
 - Ensure diagrams are in proper mermaid code blocks
 - Check mermaid syntax at https://mermaid.live
 - Use `--no-mermaid` flag to skip diagram processing
@@ -327,6 +369,6 @@ Part of the [DataKnobs](https://github.com/KBS-Labs) ecosystem.
 
 ## Support
 
-- 📧 Email: support@dataknobs.com
+- 📧 Email: support@kbs-labs.com
 - 🐛 Issues: [GitHub Issues](https://github.com/KBS-Labs/dataknobs-md-tools/issues)
 - 💬 Discussions: [GitHub Discussions](https://github.com/KBS-Labs/dataknobs-md-tools/discussions)

@@ -1,5 +1,6 @@
 {
   "theme": "default",
+  "htmlLabels": false,
   "themeVariables": {
     "primaryColor": "#f9f9f9",
     "primaryTextColor": "#333",
@@ -12,9 +13,11 @@
     "secondBkg": "#f4f4f4",
     "tertiaryBkg": "#fff",
     "textColor": "#333",
-    "fontSize": "16px"
+    "fontSize": "16px",
+    "fontFamily": "Arial, sans-serif"
   },
   "flowchart": {
+    "htmlLabels": false,
     "curve": "basis",
     "padding": 10,
     "nodeSpacing": 50,
@@ -33,8 +36,23 @@
   },
   "gantt": {
     "fontSize": 11,
-    "fontFamily": "\"Open Sans\", sans-serif",
+    "fontFamily": "\"Liberation Sans\", \"Arial\", sans-serif",
     "numberSectionStyles": 4,
     "axisFormat": "%Y-%m-%d"
+  },
+  "class": {
+    "htmlLabels": false,
+    "fontSize": 14,
+    "fontFamily": "\"Liberation Sans\", \"Arial\", sans-serif"
+  },
+  "state": {
+    "htmlLabels": false,
+    "fontSize": 14,
+    "fontFamily": "\"Liberation Sans\", \"Arial\", sans-serif"
+  },
+  "er": {
+    "htmlLabels": false,
+    "fontSize": 14,
+    "fontFamily": "\"Liberation Sans\", \"Arial\", sans-serif"
   }
 }

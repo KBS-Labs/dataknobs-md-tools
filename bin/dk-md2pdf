@@ -9,6 +9,11 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# Auto-activate virtual environment if it exists
+if [ -f "$PROJECT_ROOT/.venv/bin/activate" ]; then
+    source "$PROJECT_ROOT/.venv/bin/activate"
+fi
+
 # Color codes for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -40,6 +45,35 @@ check_docker() {
 
 # Check if native dependencies are installed
 check_native() {
+    # Virtual environment takes priority if it exists
+    if [ -f "$PROJECT_ROOT/.venv/bin/activate" ]; then
+        # Already activated above, just check if tools are available
+        true
+    else
+        # Add Python user bin to PATH if on macOS - check multiple Python versions
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            # Try current Python version first
+            PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || echo "3.9")
+            PYTHON_USER_BIN="$HOME/Library/Python/$PYTHON_VERSION/bin"
+            if [ -d "$PYTHON_USER_BIN" ] && [[ ":$PATH:" != *":$PYTHON_USER_BIN:"* ]]; then
+                export PATH="$PATH:$PYTHON_USER_BIN"
+            fi
+
+            # Also check common Python versions where weasyprint might be installed
+            for py_ver in 3.9 3.10 3.11 3.12 3.13; do
+                PYTHON_USER_BIN="$HOME/Library/Python/$py_ver/bin"
+                if [ -d "$PYTHON_USER_BIN" ] && [[ ":$PATH:" != *":$PYTHON_USER_BIN:"* ]]; then
+                    export PATH="$PATH:$PYTHON_USER_BIN"
+                fi
+            done
+        fi
+
+        # Add .local/bin to PATH if it exists
+        if [ -d "$HOME/.local/bin" ] && [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+            export PATH="$PATH:$HOME/.local/bin"
+        fi
+    fi
+
     if command -v pandoc >/dev/null 2>&1 && \
        command -v mmdc >/dev/null 2>&1 && \
        command -v weasyprint >/dev/null 2>&1; then
@@ -59,19 +93,23 @@ Usage: $(basename "$0") [OPTIONS] input.md [output]
 
 OPTIONS:
     -h, --help          Show this help message
-    -f, --format        Output format: pdf (default) or html
+    -f, --format        Force output format: pdf or html (auto-detected from extension)
     -t, --theme         CSS theme: github (default), academic, minimal
     -v, --verbose       Enable verbose output
     --no-mermaid        Skip Mermaid diagram processing
     --toc               Include table of contents
     --standalone        Create standalone HTML (embeds CSS)
+    --keep-html         When generating PDF, also save intermediate HTML
+    --keep-svgs         Keep SVG files as external files (default: embed in HTML)
     --use-docker        Force Docker usage (if available)
     --use-native        Force native tools usage (if available)
 
 EXAMPLES:
     $(basename "$0") input.md                    # Creates input.pdf
-    $(basename "$0") input.md output.pdf         # Specify output file
-    $(basename "$0") -f html input.md            # Create HTML output
+    $(basename "$0") input.md output.html        # Creates HTML (auto-detected)
+    $(basename "$0") input.md output.pdf         # Creates PDF (auto-detected)
+    $(basename "$0") --keep-html input.md        # Creates both .pdf and .html
+    $(basename "$0") --keep-svgs input.md out.html # HTML with external SVGs
     $(basename "$0") -t academic --toc input.md  # Academic style with TOC
 
 INSTALLATION:
