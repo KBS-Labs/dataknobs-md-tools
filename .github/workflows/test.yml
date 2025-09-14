@@ -12,7 +12,7 @@ jobs:
     name: Test Native Installation
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
@@ -44,7 +44,7 @@ jobs:
           test -f /tmp/minimal.pdf
 
       - name: Upload test outputs
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: native-test-outputs
@@ -55,7 +55,7 @@ jobs:
     name: Test Docker Build
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Build Docker image
         run: docker build -t dataknobs/md-tools -f docker/Dockerfile .
@@ -79,7 +79,7 @@ jobs:
           test -f /tmp/mermaid-docker.pdf
 
       - name: Upload Docker outputs
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: docker-test-outputs
@@ -90,7 +90,7 @@ jobs:
     name: Test Universal Wrapper
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Build Docker image
         run: docker build -t dataknobs/md-tools -f docker/Dockerfile .
@@ -110,7 +110,7 @@ jobs:
     name: Validate Example Files
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Check example files exist
         run: |
