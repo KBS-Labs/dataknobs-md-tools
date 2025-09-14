@@ -1,0 +1,124 @@
+name: Test Conversion
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-native:
+    runs-on: ubuntu-latest
+    name: Test Native Installation
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc python3-pip
+          pip3 install weasyprint
+          npm install -g @mermaid-js/mermaid-cli
+
+      - name: Test basic conversion
+        run: |
+          ./native/dk-md2pdf examples/basic.md /tmp/basic.pdf
+          test -f /tmp/basic.pdf
+
+      - name: Test HTML output
+        run: |
+          ./native/dk-md2pdf -f html examples/basic.md /tmp/basic.html
+          test -f /tmp/basic.html
+
+      - name: Test with mermaid diagrams
+        run: |
+          ./native/dk-md2pdf examples/mermaid-diagrams.md /tmp/mermaid.pdf
+          test -f /tmp/mermaid.pdf
+
+      - name: Test with themes
+        run: |
+          ./native/dk-md2pdf -t academic examples/complex-document.md /tmp/academic.pdf
+          ./native/dk-md2pdf -t minimal examples/complex-document.md /tmp/minimal.pdf
+          test -f /tmp/academic.pdf
+          test -f /tmp/minimal.pdf
+
+      - name: Upload test outputs
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: native-test-outputs
+          path: /tmp/*.pdf
+
+  test-docker:
+    runs-on: ubuntu-latest
+    name: Test Docker Build
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Build Docker image
+        run: docker build -t dataknobs/md-tools -f docker/Dockerfile .
+
+      - name: Test Docker conversion
+        run: |
+          docker run --rm -v $(pwd):/workspace dataknobs/md-tools \
+            examples/basic.md /tmp/basic-docker.pdf
+          test -f /tmp/basic-docker.pdf
+
+      - name: Test Docker HTML output
+        run: |
+          docker run --rm -v $(pwd):/workspace dataknobs/md-tools \
+            -f html examples/basic.md /tmp/basic-docker.html
+          test -f /tmp/basic-docker.html
+
+      - name: Test Docker with mermaid
+        run: |
+          docker run --rm -v $(pwd):/workspace dataknobs/md-tools \
+            examples/mermaid-diagrams.md /tmp/mermaid-docker.pdf
+          test -f /tmp/mermaid-docker.pdf
+
+      - name: Upload Docker outputs
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: docker-test-outputs
+          path: /tmp/*-docker.*
+
+  test-wrapper:
+    runs-on: ubuntu-latest
+    name: Test Universal Wrapper
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Build Docker image
+        run: docker build -t dataknobs/md-tools -f docker/Dockerfile .
+
+      - name: Test wrapper auto-detection
+        run: |
+          ./bin/dk-md2pdf examples/basic.md /tmp/wrapper.pdf
+          test -f /tmp/wrapper.pdf
+
+      - name: Test HTML wrapper
+        run: |
+          ./bin/dk-md2html examples/basic.md /tmp/wrapper.html
+          test -f /tmp/wrapper.html
+
+  validate-examples:
+    runs-on: ubuntu-latest
+    name: Validate Example Files
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Check example files exist
+        run: |
+          test -f examples/basic.md
+          test -f examples/mermaid-diagrams.md
+          test -f examples/complex-document.md
+
+      - name: Validate markdown syntax
+        run: |
+          npm install -g markdownlint-cli
+          markdownlint examples/*.md || true

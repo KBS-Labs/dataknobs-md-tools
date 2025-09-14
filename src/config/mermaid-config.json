@@ -1,0 +1,40 @@
+{
+  "theme": "default",
+  "themeVariables": {
+    "primaryColor": "#f9f9f9",
+    "primaryTextColor": "#333",
+    "primaryBorderColor": "#ddd",
+    "lineColor": "#666",
+    "secondaryColor": "#f4f4f4",
+    "tertiaryColor": "#fff",
+    "background": "#fff",
+    "mainBkg": "#f9f9f9",
+    "secondBkg": "#f4f4f4",
+    "tertiaryBkg": "#fff",
+    "textColor": "#333",
+    "fontSize": "16px"
+  },
+  "flowchart": {
+    "curve": "basis",
+    "padding": 10,
+    "nodeSpacing": 50,
+    "rankSpacing": 50
+  },
+  "sequence": {
+    "diagramMarginX": 50,
+    "diagramMarginY": 10,
+    "actorMargin": 50,
+    "width": 150,
+    "height": 65,
+    "boxMargin": 10,
+    "boxTextMargin": 5,
+    "noteMargin": 10,
+    "messageMargin": 35
+  },
+  "gantt": {
+    "fontSize": 11,
+    "fontFamily": "\"Open Sans\", sans-serif",
+    "numberSectionStyles": 4,
+    "axisFormat": "%Y-%m-%d"
+  }
+}

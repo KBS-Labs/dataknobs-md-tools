@@ -1,0 +1,179 @@
+#!/bin/bash
+
+# DataKnobs Markdown Tools - Universal Wrapper
+# Automatically detects and uses the best available conversion method
+
+set -e
+
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Color codes for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+print_info() {
+    echo -e "${GREEN}[INFO]${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}[ERROR]${NC} $1" >&2
+}
+
+print_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+# Check if Docker is available and running
+check_docker() {
+    if command -v docker >/dev/null 2>&1; then
+        # Check if Docker daemon is running
+        if docker info >/dev/null 2>&1; then
+            return 0
+        fi
+    fi
+    return 1
+}
+
+# Check if native dependencies are installed
+check_native() {
+    if command -v pandoc >/dev/null 2>&1 && \
+       command -v mmdc >/dev/null 2>&1 && \
+       command -v weasyprint >/dev/null 2>&1; then
+        return 0
+    fi
+    return 1
+}
+
+# Display usage information
+usage() {
+    cat << EOF
+DataKnobs Markdown Tools
+
+This tool converts Markdown files with Mermaid diagrams to PDF or HTML.
+
+Usage: $(basename "$0") [OPTIONS] input.md [output]
+
+OPTIONS:
+    -h, --help          Show this help message
+    -f, --format        Output format: pdf (default) or html
+    -t, --theme         CSS theme: github (default), academic, minimal
+    -v, --verbose       Enable verbose output
+    --no-mermaid        Skip Mermaid diagram processing
+    --toc               Include table of contents
+    --standalone        Create standalone HTML (embeds CSS)
+    --use-docker        Force Docker usage (if available)
+    --use-native        Force native tools usage (if available)
+
+EXAMPLES:
+    $(basename "$0") input.md                    # Creates input.pdf
+    $(basename "$0") input.md output.pdf         # Specify output file
+    $(basename "$0") -f html input.md            # Create HTML output
+    $(basename "$0") -t academic --toc input.md  # Academic style with TOC
+
+INSTALLATION:
+    Docker method (recommended):
+        docker pull dataknobs/md-tools
+
+    Native method:
+        $PROJECT_ROOT/native/install.sh
+
+EOF
+}
+
+# Parse command line arguments to check for help or forced mode
+FORCE_DOCKER=false
+FORCE_NATIVE=false
+
+for arg in "$@"; do
+    case $arg in
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        --use-docker)
+            FORCE_DOCKER=true
+            ;;
+        --use-native)
+            FORCE_NATIVE=true
+            ;;
+    esac
+done
+
+# Determine which method to use
+USE_METHOD=""
+
+if [ "$FORCE_DOCKER" = true ] && [ "$FORCE_NATIVE" = true ]; then
+    print_error "Cannot force both Docker and native methods"
+    exit 1
+fi
+
+if [ "$FORCE_DOCKER" = true ]; then
+    if check_docker; then
+        USE_METHOD="docker"
+    else
+        print_error "Docker is not available or not running"
+        exit 1
+    fi
+elif [ "$FORCE_NATIVE" = true ]; then
+    if check_native; then
+        USE_METHOD="native"
+    else
+        print_error "Native tools are not fully installed"
+        echo "Run: $PROJECT_ROOT/native/install.sh"
+        exit 1
+    fi
+else
+    # Auto-detect best available method
+    if check_docker; then
+        USE_METHOD="docker"
+    elif check_native; then
+        USE_METHOD="native"
+    else
+        # Neither method is available
+        print_error "No conversion method available"
+        echo ""
+        echo "Please install using one of these methods:"
+        echo ""
+        echo "1. Docker (recommended):"
+        echo "   - Install Docker: https://docs.docker.com/get-docker/"
+        echo "   - Pull image: docker pull dataknobs/md-tools"
+        echo ""
+        echo "2. Native installation:"
+        echo "   - Run: $PROJECT_ROOT/native/install.sh"
+        echo ""
+        exit 1
+    fi
+fi
+
+# Filter out the force flags before passing to actual converter
+FILTERED_ARGS=()
+for arg in "$@"; do
+    if [ "$arg" != "--use-docker" ] && [ "$arg" != "--use-native" ]; then
+        FILTERED_ARGS+=("$arg")
+    fi
+done
+
+# Execute using the selected method
+if [ "$USE_METHOD" = "docker" ]; then
+    # Check if image exists
+    if ! docker image inspect dataknobs/md-tools >/dev/null 2>&1; then
+        print_warning "Docker image not found. Pulling dataknobs/md-tools..."
+        docker pull dataknobs/md-tools || {
+            print_error "Failed to pull Docker image"
+            echo "You can build it locally with:"
+            echo "  cd $PROJECT_ROOT"
+            echo "  docker build -t dataknobs/md-tools -f docker/Dockerfile ."
+            exit 1
+        }
+    fi
+
+    # Run with Docker
+    exec docker run --rm -v "$(pwd):/workspace" dataknobs/md-tools "${FILTERED_ARGS[@]}"
+else
+    # Run with native tools
+    exec "$PROJECT_ROOT/native/dk-md2pdf" "${FILTERED_ARGS[@]}"
+fi

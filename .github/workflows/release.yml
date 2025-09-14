@@ -1,0 +1,155 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    name: Create GitHub Release
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Create release archive
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          tar -czf dataknobs-md-tools-${VERSION}.tar.gz \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='*.pdf' \
+            --exclude='*.html' \
+            .
+          zip -r dataknobs-md-tools-${VERSION}.zip . \
+            -x '.git/*' \
+            -x '.github/*' \
+            -x '*.pdf' \
+            -x '*.html'
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          cat << EOF > release_notes.md
+          # DataKnobs Markdown Tools ${VERSION}
+
+          ## Installation
+
+          ### Docker (Recommended)
+          \`\`\`bash
+          docker pull dataknobs/md-tools:${VERSION}
+          \`\`\`
+
+          ### Native Installation
+          \`\`\`bash
+          # Download and extract
+          curl -L https://github.com/KBS-Labs/dataknobs-md-tools/releases/download/${VERSION}/dataknobs-md-tools-${VERSION}.tar.gz | tar xz
+          cd dataknobs-md-tools
+          ./native/install.sh
+          \`\`\`
+
+          ## What's Changed
+          See [CHANGELOG.md](https://github.com/KBS-Labs/dataknobs-md-tools/blob/${VERSION}/CHANGELOG.md) for details.
+
+          ## Quick Start
+          \`\`\`bash
+          # Using Docker
+          docker run --rm -v \$(pwd):/workspace dataknobs/md-tools:${VERSION} input.md output.pdf
+
+          # Using native installation
+          ./bin/dk-md2pdf input.md output.pdf
+          \`\`\`
+          EOF
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          body_path: release_notes.md
+          files: |
+            dataknobs-md-tools-*.tar.gz
+            dataknobs-md-tools-*.zip
+          draft: false
+          prerelease: false
+
+  build-binaries:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: macos-latest
+            platform: macos
+
+    name: Build ${{ matrix.platform }} binary
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Create standalone script
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          mkdir -p dist
+
+          # Create a self-contained installation script
+          cat << 'EOF' > dist/install-dk-md-tools-${{ matrix.platform }}.sh
+          #!/bin/bash
+          set -e
+
+          echo "DataKnobs Markdown Tools Installer"
+          echo "===================================="
+          echo ""
+
+          # Create installation directory
+          INSTALL_DIR="$HOME/.dataknobs-md-tools"
+          mkdir -p "$INSTALL_DIR"
+
+          # Download and extract
+          echo "Downloading DataKnobs MD Tools..."
+          curl -L https://github.com/KBS-Labs/dataknobs-md-tools/archive/refs/tags/${VERSION}.tar.gz | tar xz -C "$INSTALL_DIR" --strip-components=1
+
+          # Run native installer
+          echo "Installing dependencies..."
+          cd "$INSTALL_DIR"
+          ./native/install.sh
+
+          # Add to PATH
+          echo ""
+          echo "Installation complete!"
+          echo ""
+          echo "Add to your PATH by running:"
+          echo "  export PATH=\"\$PATH:$INSTALL_DIR/bin\""
+          echo ""
+          echo "Or add the above line to your ~/.bashrc or ~/.zshrc"
+          EOF
+
+          chmod +x dist/install-dk-md-tools-${{ matrix.platform }}.sh
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v3
+        with:
+          name: installer-${{ matrix.platform }}
+          path: dist/install-dk-md-tools-${{ matrix.platform }}.sh
+
+  attach-installers:
+    needs: build-binaries
+    runs-on: ubuntu-latest
+    name: Attach Installers to Release
+
+    steps:
+      - name: Download installers
+        uses: actions/download-artifact@v3
+        with:
+          path: installers
+
+      - name: Attach to release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: installers/**/*.sh
