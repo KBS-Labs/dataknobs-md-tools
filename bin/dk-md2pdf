@@ -88,6 +88,7 @@ usage() {
 DataKnobs Markdown Tools
 
 This tool converts Markdown files with Mermaid diagrams to PDF or HTML.
+Auto-detects and uses the best available method (native preferred for performance).
 
 Usage: $(basename "$0") [OPTIONS] input.md [output]
 
@@ -125,6 +126,7 @@ EOF
 # Parse command line arguments to check for help or forced mode
 FORCE_DOCKER=false
 FORCE_NATIVE=false
+VERBOSE=false
 
 for arg in "$@"; do
     case $arg in
@@ -137,6 +139,9 @@ for arg in "$@"; do
             ;;
         --use-native)
             FORCE_NATIVE=true
+            ;;
+        -v|--verbose)
+            VERBOSE=true
             ;;
     esac
 done
@@ -166,22 +171,23 @@ elif [ "$FORCE_NATIVE" = true ]; then
     fi
 else
     # Auto-detect best available method
-    if check_docker; then
-        USE_METHOD="docker"
-    elif check_native; then
+    # Prefer native for better performance when available
+    if check_native; then
         USE_METHOD="native"
+    elif check_docker; then
+        USE_METHOD="docker"
     else
         # Neither method is available
         print_error "No conversion method available"
         echo ""
         echo "Please install using one of these methods:"
         echo ""
-        echo "1. Docker (recommended):"
+        echo "1. Native installation (faster):"
+        echo "   - Run: $PROJECT_ROOT/native/install.sh"
+        echo ""
+        echo "2. Docker (easier setup):"
         echo "   - Install Docker: https://docs.docker.com/get-docker/"
         echo "   - Pull image: docker pull dataknobs/md-tools"
-        echo ""
-        echo "2. Native installation:"
-        echo "   - Run: $PROJECT_ROOT/native/install.sh"
         echo ""
         exit 1
     fi
@@ -194,6 +200,11 @@ for arg in "$@"; do
         FILTERED_ARGS+=("$arg")
     fi
 done
+
+# Show which method is being used (only in verbose mode or if forced)
+if [ "$VERBOSE" = true ] || [ "$FORCE_DOCKER" = true ] || [ "$FORCE_NATIVE" = true ]; then
+    print_info "Using $USE_METHOD method"
+fi
 
 # Execute using the selected method
 if [ "$USE_METHOD" = "docker" ]; then
