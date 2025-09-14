@@ -1,4 +1,5 @@
-FROM node:20-slim
+# Use Node 22 for latest npm and better performance
+FROM node:22-slim
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -6,14 +7,17 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     python3-cffi \
     python3-brotli \
+    python3-venv \
     libpango-1.0-0 \
     libpangoft2-1.0-0 \
     libharfbuzz0b \
     libpangocairo-1.0-0 \
     chromium \
     fonts-liberation \
+    fonts-liberation2 \
     fonts-noto \
     fonts-noto-cjk \
+    fonts-dejavu \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
@@ -21,11 +25,20 @@ RUN apt-get update && apt-get install -y \
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
-# Install Python packages
-RUN pip3 install --no-cache-dir --break-system-packages weasyprint
+# Update npm to latest version first
+RUN npm install -g npm@latest
 
-# Install Node packages
-RUN npm install -g @mermaid-js/mermaid-cli
+# Install Python packages in a virtual environment to avoid warnings
+RUN python3 -m venv /opt/venv && \
+    /opt/venv/bin/pip install --upgrade pip && \
+    /opt/venv/bin/pip install --no-cache-dir weasyprint
+
+# Make virtual environment available
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Install mermaid-cli globally the simple way
+# The deprecation warning doesn't affect functionality
+RUN npm install -g @mermaid-js/mermaid-cli@latest
 
 # Create app directory
 WORKDIR /app
@@ -34,12 +47,20 @@ WORKDIR /app
 COPY src/ /app/src/
 COPY native/dk-md2pdf /app/dk-md2pdf
 COPY docker/docker-entrypoint.sh /app/docker-entrypoint.sh
+COPY docker/puppeteer-config.json /app/src/config/puppeteer-config.json
+COPY docker/.puppeteerrc.cjs /app/.puppeteerrc.cjs
+
+# Also copy to root for mmdc to find it
+COPY docker/.puppeteerrc.cjs /.puppeteerrc.cjs
 
 # Make scripts executable
 RUN chmod +x /app/dk-md2pdf /app/docker-entrypoint.sh
 
 # Create workspace directory
 WORKDIR /workspace
+
+# Create .dockerenv to indicate we're in Docker
+RUN touch /.dockerenv
 
 # Set entrypoint
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
