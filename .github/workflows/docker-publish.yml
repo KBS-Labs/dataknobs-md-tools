@@ -1,4 +1,4 @@
-name: Docker Publish
+name: Docker Build
 
 on:
   push:
@@ -6,14 +6,15 @@ on:
       - 'v*'
   release:
     types: [published]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
 env:
-  REGISTRY: docker.io
   IMAGE_NAME: dataknobs/md-tools
 
 jobs:
-  build-and-push:
+  build-and-test:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -26,11 +27,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+      # Docker Hub login disabled until organization account is ready
+      # - name: Log in to Docker Hub
+      #   uses: docker/login-action@v3
+      #   with:
+      #     username: ${{ secrets.DOCKER_USERNAME }}
+      #     password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Extract metadata
         id: meta
@@ -45,19 +47,35 @@ jobs:
             type=semver,pattern={{major}}
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and push Docker image
+      - name: Build Docker image (no push)
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./docker/Dockerfile
           platforms: linux/amd64,linux/arm64
-          push: true
+          push: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # Output to local for testing
+          load: true
 
-      - name: Test published image
+      - name: Test built image
         run: |
-          docker pull ${{ env.IMAGE_NAME }}:latest
           docker run --rm ${{ env.IMAGE_NAME }}:latest --help
+          echo "✅ Docker image built and tested successfully"
+
+      # Uncomment when Docker Hub is ready:
+      # - name: Push to Docker Hub
+      #   if: github.event_name != 'pull_request'
+      #   uses: docker/build-push-action@v5
+      #   with:
+      #     context: .
+      #     file: ./docker/Dockerfile
+      #     platforms: linux/amd64,linux/arm64
+      #     push: true
+      #     tags: ${{ steps.meta.outputs.tags }}
+      #     labels: ${{ steps.meta.outputs.labels }}
+      #     cache-from: type=gha
+      #     cache-to: type=gha,mode=max

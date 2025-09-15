@@ -17,9 +17,14 @@ Convert Markdown files with Mermaid diagrams to beautiful PDF and HTML documents
 
 ### Option 1: Docker (Recommended - Single Dependency)
 
+**🐳 Docker Hub: Coming Soon!** The official Docker image will be available at `dataknobs/md-tools`.
+
+For now, build locally:
 ```bash
-# Pull the image
-docker pull dataknobs/md-tools
+# Clone and build the image locally
+git clone https://github.com/KBS-Labs/dataknobs-md-tools
+cd dataknobs-md-tools
+docker build -t dataknobs/md-tools -f docker/Dockerfile .
 
 # Convert markdown to PDF
 docker run --rm -v $(pwd):/workspace dataknobs/md-tools input.md output.pdf
@@ -52,10 +57,7 @@ cd dataknobs-md-tools
 Requires only Docker installed on your system:
 
 ```bash
-# Pull the pre-built image
-docker pull dataknobs/md-tools
-
-# Or build locally
+# Clone and build locally (Docker Hub coming soon!)
 git clone https://github.com/KBS-Labs/dataknobs-md-tools
 cd dataknobs-md-tools
 docker build -t dataknobs/md-tools -f docker/Dockerfile .
