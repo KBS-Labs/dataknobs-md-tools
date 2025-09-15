@@ -5,6 +5,42 @@
 
 set -e
 
+# Get the project root directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# In Docker, PROJECT_ROOT is set by the entrypoint
+if [ -z "$PROJECT_ROOT" ]; then
+    PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+fi
+
+# Auto-activate virtual environment if it exists (takes priority)
+if [ -f "$PROJECT_ROOT/.venv/bin/activate" ]; then
+    source "$PROJECT_ROOT/.venv/bin/activate"
+else
+    # Fall back to system Python paths
+    # Setup PATH for Python packages
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # Try current Python version first
+        PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || echo "3.9")
+        PYTHON_USER_BIN="$HOME/Library/Python/$PYTHON_VERSION/bin"
+        if [ -d "$PYTHON_USER_BIN" ] && [[ ":$PATH:" != *":$PYTHON_USER_BIN:"* ]]; then
+            export PATH="$PATH:$PYTHON_USER_BIN"
+        fi
+
+        # Also check common Python versions where weasyprint might be installed
+        for py_ver in 3.9 3.10 3.11 3.12 3.13; do
+            PYTHON_USER_BIN="$HOME/Library/Python/$py_ver/bin"
+            if [ -d "$PYTHON_USER_BIN" ] && [[ ":$PATH:" != *":$PYTHON_USER_BIN:"* ]]; then
+                export PATH="$PATH:$PYTHON_USER_BIN"
+            fi
+        done
+    fi
+
+    # Add .local/bin to PATH if it exists
+    if [ -d "$HOME/.local/bin" ] && [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+        export PATH="$PATH:$HOME/.local/bin"
+    fi
+fi
+
 # Color codes for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -65,20 +101,26 @@ usage() {
 Usage: $(basename "$0") [OPTIONS] input.md [output]
 
 Convert Markdown files with Mermaid diagrams to PDF or HTML.
+Output format is auto-detected from file extension (.html/.htm for HTML, .pdf for PDF).
 
 OPTIONS:
     -h, --help          Show this help message
-    -f, --format        Output format: pdf (default) or html
+    -f, --format        Force output format: pdf or html (overrides extension)
     -t, --theme         CSS theme: github (default), academic, minimal
     -v, --verbose       Enable verbose output
     --no-mermaid        Skip Mermaid diagram processing
     --toc               Include table of contents
     --standalone        Create standalone HTML (embeds CSS)
+    --keep-html         When generating PDF, also save the intermediate HTML
+    --keep-svgs         Keep SVG files as external files (default: embed in HTML)
 
 EXAMPLES:
     $(basename "$0") input.md                    # Creates input.pdf
-    $(basename "$0") input.md output.pdf         # Specify output file
-    $(basename "$0") -f html input.md            # Create HTML output
+    $(basename "$0") input.md output.html        # Creates HTML with embedded SVGs
+    $(basename "$0") input.md output.pdf         # Creates PDF (auto-detected)
+    $(basename "$0") --keep-html input.md        # Creates both .pdf and .html
+    $(basename "$0") --keep-svgs input.md out.html # HTML with external SVG files
+    $(basename "$0") -f html input.md output     # Force HTML despite no extension
     $(basename "$0") -t academic --toc input.md  # Academic style with TOC
 
 EOF
@@ -88,6 +130,9 @@ EOF
 SKIP_MERMAID=false
 INCLUDE_TOC=false
 STANDALONE=false
+KEEP_HTML=false
+KEEP_SVGS=false
+FORMAT_OVERRIDE=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -96,7 +141,7 @@ while [[ $# -gt 0 ]]; do
             exit 0
             ;;
         -f|--format)
-            OUTPUT_FORMAT="$2"
+            FORMAT_OVERRIDE="$2"
             shift 2
             ;;
         -t|--theme)
@@ -117,6 +162,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --standalone)
             STANDALONE=true
+            shift
+            ;;
+        --keep-html)
+            KEEP_HTML=true
+            shift
+            ;;
+        --keep-svgs)
+            KEEP_SVGS=true
             shift
             ;;
         -*)
@@ -151,17 +204,47 @@ if [ ! -f "$INPUT_FILE" ]; then
     exit 1
 fi
 
-# Set default output file if not specified
-if [ -z "$OUTPUT_FILE" ]; then
+# Determine output format from file extension if provided
+if [ -n "$OUTPUT_FILE" ]; then
+    # Check file extension (case insensitive)
+    OUTPUT_EXT="${OUTPUT_FILE##*.}"
+    OUTPUT_EXT_LOWER=$(echo "$OUTPUT_EXT" | tr '[:upper:]' '[:lower:]')
+
+    case "$OUTPUT_EXT_LOWER" in
+        html|htm)
+            OUTPUT_FORMAT="html"
+            ;;
+        pdf)
+            OUTPUT_FORMAT="pdf"
+            ;;
+        *)
+            # If no recognized extension, use format override or default to pdf
+            if [ -n "$FORMAT_OVERRIDE" ]; then
+                OUTPUT_FORMAT="$FORMAT_OVERRIDE"
+            else
+                OUTPUT_FORMAT="pdf"
+            fi
+            ;;
+    esac
+else
+    # No output file specified, use format override or default
+    if [ -n "$FORMAT_OVERRIDE" ]; then
+        OUTPUT_FORMAT="$FORMAT_OVERRIDE"
+    else
+        OUTPUT_FORMAT="pdf"
+    fi
     OUTPUT_FILE="${INPUT_FILE%.md}.${OUTPUT_FORMAT}"
+fi
+
+# Override with explicit format flag if provided
+if [ -n "$FORMAT_OVERRIDE" ]; then
+    OUTPUT_FORMAT="$FORMAT_OVERRIDE"
 fi
 
 # Check dependencies
 check_dependencies
 
 # Get absolute paths
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 TEMP_DIR=$(mktemp -d)
 
 # Cleanup on exit
@@ -170,23 +253,92 @@ trap "rm -rf $TEMP_DIR" EXIT
 # Process the markdown file
 print_info "Processing: $INPUT_FILE → $OUTPUT_FILE"
 
+# Save original directory for later use
+ORIG_DIR="$(pwd)"
+
 # Step 1: Process Mermaid diagrams if present
 if [ "$SKIP_MERMAID" = false ] && grep -q '```mermaid' "$INPUT_FILE"; then
     print_info "Processing Mermaid diagrams..."
 
-    # Use mermaid-cli to process diagrams
-    if [ -f "$PROJECT_ROOT/src/config/mermaid-config.json" ]; then
-        mmdc -i "$INPUT_FILE" -o "$TEMP_DIR/processed.md" \
-             -c "$PROJECT_ROOT/src/config/mermaid-config.json" 2>/dev/null || {
-            print_warning "Mermaid processing failed, continuing without diagrams"
-            cp "$INPUT_FILE" "$TEMP_DIR/processed.md"
-        }
+    # Get absolute path of input file before changing directory
+    if [[ "$INPUT_FILE" = /* ]]; then
+        INPUT_ABS="$INPUT_FILE"
     else
-        mmdc -i "$INPUT_FILE" -o "$TEMP_DIR/processed.md" 2>/dev/null || {
-            print_warning "Mermaid processing failed, continuing without diagrams"
-            cp "$INPUT_FILE" "$TEMP_DIR/processed.md"
-        }
+        INPUT_ABS="$ORIG_DIR/$INPUT_FILE"
     fi
+
+    # Change to temp directory so SVGs are generated in the right place
+    cd "$TEMP_DIR"
+
+    # If running in Docker, copy puppeteer config to temp directory
+    if [ -f /.puppeteerrc.cjs ]; then
+        cp /.puppeteerrc.cjs .puppeteerrc.cjs
+    fi
+
+    # Use mermaid-cli to process diagrams with proper configuration
+    MERMAID_CONFIG=""
+    PUPPETEER_CONFIG=""
+
+    if [ -f "$PROJECT_ROOT/src/config/mermaid-config.json" ]; then
+        MERMAID_CONFIG="-c $PROJECT_ROOT/src/config/mermaid-config.json"
+    fi
+
+    # Use puppeteer config for both Docker and native
+    if [ -f "$PROJECT_ROOT/src/config/puppeteer-config.json" ]; then
+        PUPPETEER_CONFIG="-p $PROJECT_ROOT/src/config/puppeteer-config.json"
+    fi
+
+    # Debug output
+    if [ "$VERBOSE" = true ]; then
+        echo "PROJECT_ROOT: $PROJECT_ROOT" >&2
+        echo "MERMAID_CONFIG: $MERMAID_CONFIG" >&2
+        echo "PUPPETEER_CONFIG: $PUPPETEER_CONFIG" >&2
+    fi
+
+    # Run mermaid-cli with both configs if available (now in temp dir)
+    if [ -n "$MERMAID_CONFIG" ] && [ -n "$PUPPETEER_CONFIG" ]; then
+        if [ "$VERBOSE" = true ]; then
+            echo "Running: mmdc -i \"$INPUT_ABS\" -o \"processed.md\" $MERMAID_CONFIG $PUPPETEER_CONFIG" >&2
+            mmdc -i "$INPUT_ABS" -o "processed.md" $MERMAID_CONFIG $PUPPETEER_CONFIG || {
+                print_warning "Mermaid processing failed, continuing without diagrams"
+                cp "$INPUT_ABS" "processed.md"
+            }
+        else
+            mmdc -i "$INPUT_ABS" -o "processed.md" $MERMAID_CONFIG $PUPPETEER_CONFIG 2>/dev/null || {
+                print_warning "Mermaid processing failed, continuing without diagrams"
+                cp "$INPUT_ABS" "processed.md"
+            }
+        fi
+    elif [ -n "$MERMAID_CONFIG" ]; then
+        if [ "$VERBOSE" = true ]; then
+            echo "Running: mmdc -i \"$INPUT_ABS\" -o \"processed.md\" $MERMAID_CONFIG" >&2
+            mmdc -i "$INPUT_ABS" -o "processed.md" $MERMAID_CONFIG || {
+                print_warning "Mermaid processing failed, continuing without diagrams"
+                cp "$INPUT_ABS" "processed.md"
+            }
+        else
+            mmdc -i "$INPUT_ABS" -o "processed.md" $MERMAID_CONFIG 2>/dev/null || {
+                print_warning "Mermaid processing failed, continuing without diagrams"
+                cp "$INPUT_ABS" "processed.md"
+            }
+        fi
+    else
+        if [ "$VERBOSE" = true ]; then
+            echo "Running: mmdc -i \"$INPUT_ABS\" -o \"processed.md\"" >&2
+            mmdc -i "$INPUT_ABS" -o "processed.md" || {
+                print_warning "Mermaid processing failed, continuing without diagrams"
+                cp "$INPUT_ABS" "processed.md"
+            }
+        else
+            mmdc -i "$INPUT_ABS" -o "processed.md" 2>/dev/null || {
+                print_warning "Mermaid processing failed, continuing without diagrams"
+                cp "$INPUT_ABS" "processed.md"
+            }
+        fi
+    fi
+
+    # Change back to original directory
+    cd - >/dev/null
 else
     cp "$INPUT_FILE" "$TEMP_DIR/processed.md"
 fi
@@ -212,7 +364,8 @@ if [ -f "$CSS_PATH" ]; then
     if [ "$STANDALONE" = true ] || [ "$OUTPUT_FORMAT" = "pdf" ]; then
         # Embed CSS for standalone or PDF output
         PANDOC_OPTS+=(--css="$CSS_PATH")
-        PANDOC_OPTS+=(--embed-resources)
+        # Use --self-contained for pandoc < 3.0 (Docker uses older version)
+        PANDOC_OPTS+=(--self-contained)
     else
         # Link to CSS for regular HTML
         PANDOC_OPTS+=(--css="$CSS_PATH")
@@ -226,24 +379,143 @@ PANDOC_OPTS+=(--metadata title="$(basename "${INPUT_FILE%.md}")")
 if [ "$OUTPUT_FORMAT" = "html" ]; then
     print_info "Generating HTML..."
 
-    pandoc "$TEMP_DIR/processed.md" \
-           "${PANDOC_OPTS[@]}" \
-           -o "$OUTPUT_FILE"
+    # Get absolute path of output file
+    if [[ "$OUTPUT_FILE" = /* ]]; then
+        OUTPUT_ABS="$OUTPUT_FILE"
+    else
+        OUTPUT_ABS="$ORIG_DIR/$OUTPUT_FILE"
+    fi
+
+    # Run pandoc from temp directory so it can find the SVGs
+    cd "$TEMP_DIR"
+
+    if [ "$KEEP_SVGS" = false ]; then
+        # Embed SVGs as base64 data URIs for self-contained HTML
+        if ls processed-*.svg >/dev/null 2>&1; then
+            print_info "Embedding SVG images in HTML..."
+
+            # Create a copy of processed.md with embedded SVGs
+            cp processed.md processed-embedded.md
+
+            # Replace each SVG reference with base64 data URI
+            for svg_file in processed-*.svg; do
+                if [ -f "$svg_file" ]; then
+                    # Encode SVG to base64 and create data URI
+                    base64_data=$(base64 < "$svg_file" | tr -d '\n')
+                    data_uri="data:image/svg+xml;base64,$base64_data"
+
+                    # Replace the reference in the markdown file
+                    # Use sed with a different delimiter to avoid issues with slashes
+                    sed -i.bak "s|\./$svg_file|$data_uri|g" processed-embedded.md
+                fi
+            done
+
+            # Remove backup file
+            rm -f processed-embedded.md.bak
+
+            # Use the embedded version for pandoc
+            # Use --self-contained for older pandoc versions
+            pandoc "processed-embedded.md" \
+                   "${PANDOC_OPTS[@]}" \
+                   --self-contained \
+                   -o "$OUTPUT_ABS"
+        else
+            # No SVGs to embed, just convert normally
+            pandoc "processed.md" \
+                   "${PANDOC_OPTS[@]}" \
+                   -o "$OUTPUT_ABS"
+        fi
+    else
+        # Keep SVGs as external files (original behavior)
+        pandoc "processed.md" \
+               "${PANDOC_OPTS[@]}" \
+               --resource-path=".:$TEMP_DIR" \
+               -o "$OUTPUT_ABS"
+
+        # Copy SVG files to the same directory as HTML
+        OUTPUT_DIR=$(dirname "$OUTPUT_ABS")
+        if ls processed-*.svg >/dev/null 2>&1; then
+            cp processed-*.svg "$OUTPUT_DIR/"
+            print_info "SVG files copied to output directory"
+        fi
+    fi
+
+    cd - >/dev/null
 
 elif [ "$OUTPUT_FORMAT" = "pdf" ]; then
     print_info "Generating PDF..."
 
+    # Get absolute path of output file
+    if [[ "$OUTPUT_FILE" = /* ]]; then
+        OUTPUT_ABS="$OUTPUT_FILE"
+    else
+        OUTPUT_ABS="$ORIG_DIR/$OUTPUT_FILE"
+    fi
+
+    # Run pandoc from temp directory so it can find the SVGs
+    cd "$TEMP_DIR"
+
     # First convert to HTML
-    pandoc "$TEMP_DIR/processed.md" \
+    pandoc "processed.md" \
            "${PANDOC_OPTS[@]}" \
-           -o "$TEMP_DIR/output.html"
+           --resource-path=".:$TEMP_DIR" \
+           -o "output.html"
+
+    # If --keep-html is set, save the HTML file
+    if [ "$KEEP_HTML" = true ]; then
+        HTML_FILE="${OUTPUT_ABS%.pdf}.html"
+
+        if [ "$KEEP_SVGS" = false ]; then
+            # Embed SVGs in the HTML for a self-contained file
+            if ls processed-*.svg >/dev/null 2>&1; then
+                print_info "Creating self-contained HTML with embedded SVGs..."
+
+                # Create a copy of output.html with embedded SVGs
+                cp output.html output-embedded.html
+
+                # Replace each SVG reference with base64 data URI
+                for svg_file in processed-*.svg; do
+                    if [ -f "$svg_file" ]; then
+                        # Encode SVG to base64 and create data URI
+                        base64_data=$(base64 < "$svg_file" | tr -d '\n')
+                        data_uri="data:image/svg+xml;base64,$base64_data"
+
+                        # Replace the reference in the HTML file
+                        sed -i.bak "s|\./$svg_file|$data_uri|g" output-embedded.html
+                    fi
+                done
+
+                # Remove backup file
+                rm -f output-embedded.html.bak
+
+                # Save the embedded version
+                cp output-embedded.html "$HTML_FILE"
+            else
+                cp "output.html" "$HTML_FILE"
+            fi
+        else
+            # Keep SVGs as external files
+            cp "output.html" "$HTML_FILE"
+
+            # Copy SVG files to the same directory as HTML
+            OUTPUT_DIR=$(dirname "$HTML_FILE")
+            if ls processed-*.svg >/dev/null 2>&1; then
+                cp processed-*.svg "$OUTPUT_DIR/"
+                print_info "SVG files copied to output directory"
+            fi
+        fi
+
+        print_info "HTML saved to: $HTML_FILE"
+    fi
 
     # Then use weasyprint for PDF generation
     if [ "$VERBOSE" = true ]; then
-        weasyprint "$TEMP_DIR/output.html" "$OUTPUT_FILE"
+        weasyprint "output.html" "$OUTPUT_ABS"
     else
-        weasyprint "$TEMP_DIR/output.html" "$OUTPUT_FILE" 2>/dev/null
+        weasyprint "output.html" "$OUTPUT_ABS" 2>/dev/null
     fi
+
+    cd - >/dev/null
 else
     print_error "Unsupported output format: $OUTPUT_FORMAT"
     exit 1

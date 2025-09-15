@@ -1,0 +1,36 @@
+# Example Dockerfile for DataKnobs Markdown Tools
+# This shows how to properly set up the tools in a Docker container
+
+FROM ubuntu:22.04
+
+# Set non-interactive installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install basic dependencies
+RUN apt-get update && \
+    apt-get install -y \
+    curl \
+    git \
+    sudo \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the project files
+WORKDIR /app
+COPY . .
+
+# Run the CI installer which includes all font dependencies
+RUN chmod +x ./native/install-ci.sh && \
+    ./native/install-ci.sh
+
+# Set up PATH for any user-installed Python packages
+ENV PATH="/root/.local/bin:${PATH}"
+
+# Create a directory for input/output
+WORKDIR /workspace
+
+# Default command
+CMD ["bash"]
+
+# Usage:
+# docker build -t dataknobs-md-tools -f docker/Dockerfile.example .
+# docker run -v $(pwd):/workspace dataknobs-md-tools /app/bin/dk-md2pdf input.md output.pdf

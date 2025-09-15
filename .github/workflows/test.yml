@@ -12,7 +12,7 @@ jobs:
     name: Test Native Installation
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
@@ -44,7 +44,7 @@ jobs:
           test -f /tmp/minimal.pdf
 
       - name: Upload test outputs
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: native-test-outputs
@@ -55,7 +55,7 @@ jobs:
     name: Test Docker Build
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Build Docker image
         run: docker build -t dataknobs/md-tools -f docker/Dockerfile .
@@ -63,54 +63,54 @@ jobs:
       - name: Test Docker conversion
         run: |
           docker run --rm -v $(pwd):/workspace dataknobs/md-tools \
-            examples/basic.md /tmp/basic-docker.pdf
-          test -f /tmp/basic-docker.pdf
+            examples/basic.md basic-docker.pdf
+          test -f basic-docker.pdf
 
       - name: Test Docker HTML output
         run: |
           docker run --rm -v $(pwd):/workspace dataknobs/md-tools \
-            -f html examples/basic.md /tmp/basic-docker.html
-          test -f /tmp/basic-docker.html
+            -f html examples/basic.md basic-docker.html
+          test -f basic-docker.html
 
       - name: Test Docker with mermaid
         run: |
           docker run --rm -v $(pwd):/workspace dataknobs/md-tools \
-            examples/mermaid-diagrams.md /tmp/mermaid-docker.pdf
-          test -f /tmp/mermaid-docker.pdf
+            examples/mermaid-diagrams.md mermaid-docker.pdf
+          test -f mermaid-docker.pdf
 
       - name: Upload Docker outputs
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: docker-test-outputs
-          path: /tmp/*-docker.*
+          path: '*-docker.*'
 
   test-wrapper:
     runs-on: ubuntu-latest
     name: Test Universal Wrapper
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Build Docker image
         run: docker build -t dataknobs/md-tools -f docker/Dockerfile .
 
       - name: Test wrapper auto-detection
         run: |
-          ./bin/dk-md2pdf examples/basic.md /tmp/wrapper.pdf
-          test -f /tmp/wrapper.pdf
+          ./bin/dk-md2pdf examples/basic.md wrapper.pdf
+          test -f wrapper.pdf
 
       - name: Test HTML wrapper
         run: |
-          ./bin/dk-md2html examples/basic.md /tmp/wrapper.html
-          test -f /tmp/wrapper.html
+          ./bin/dk-md2html examples/basic.md wrapper.html
+          test -f wrapper.html
 
   validate-examples:
     runs-on: ubuntu-latest
     name: Validate Example Files
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Check example files exist
         run: |

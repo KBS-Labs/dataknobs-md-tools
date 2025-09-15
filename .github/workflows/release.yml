@@ -15,7 +15,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Create release archive
         run: |
@@ -68,7 +68,7 @@ jobs:
           EOF
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           body_path: release_notes.md
           files: |
@@ -91,7 +91,7 @@ jobs:
     name: Build ${{ matrix.platform }} binary
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Create standalone script
         run: |
@@ -133,7 +133,7 @@ jobs:
           chmod +x dist/install-dk-md-tools-${{ matrix.platform }}.sh
 
       - name: Upload installer
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: installer-${{ matrix.platform }}
           path: dist/install-dk-md-tools-${{ matrix.platform }}.sh
@@ -145,11 +145,11 @@ jobs:
 
     steps:
       - name: Download installers
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: installers
 
       - name: Attach to release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: installers/**/*.sh

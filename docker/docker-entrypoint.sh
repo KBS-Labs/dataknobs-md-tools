@@ -45,6 +45,10 @@ fi
 # Set the PROJECT_ROOT for the converter script
 export PROJECT_ROOT=/app
 
+# Set Puppeteer environment variables for Docker
+export PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+export PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
 # Change to workspace
 cd /workspace
 
