@@ -113,6 +113,7 @@ OPTIONS:
     --standalone        Create standalone HTML (embeds CSS)
     --keep-html         When generating PDF, also save the intermediate HTML
     --keep-svgs         Keep SVG files as external files (default: embed in HTML)
+    --show-filename     Include filename as heading in output (default: omit)
 
 EXAMPLES:
     $(basename "$0") input.md                    # Creates input.pdf
@@ -132,6 +133,7 @@ INCLUDE_TOC=false
 STANDALONE=false
 KEEP_HTML=false
 KEEP_SVGS=false
+SHOW_FILENAME=false
 FORMAT_OVERRIDE=""
 
 while [[ $# -gt 0 ]]; do
@@ -170,6 +172,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --keep-svgs)
             KEEP_SVGS=true
+            shift
+            ;;
+        --show-filename)
+            SHOW_FILENAME=true
             shift
             ;;
         -*)
@@ -372,8 +378,10 @@ if [ -f "$CSS_PATH" ]; then
     fi
 fi
 
-# Add metadata
-PANDOC_OPTS+=(--metadata title="$(basename "${INPUT_FILE%.md}")")
+# Add metadata - only include filename as title if requested
+if [ "$SHOW_FILENAME" = true ]; then
+    PANDOC_OPTS+=(--metadata title="$(basename "${INPUT_FILE%.md}")")
+fi
 
 # Step 3: Convert based on output format
 if [ "$OUTPUT_FORMAT" = "html" ]; then
