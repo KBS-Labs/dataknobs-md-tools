@@ -314,6 +314,32 @@ dk-md2pdf -v input.md
 
 ### Mermaid Rendering Issues
 
+**Mermaid processing failed warning?** This usually indicates a parsing error in your Mermaid diagrams.
+
+To diagnose the issue:
+```bash
+# Use verbose mode to see the actual error
+dk-md2pdf -v input.md output.html
+```
+
+Common issue: **"Lexical error" or "Unrecognized text" errors**
+
+If you see errors like `Lexical error on line X. Unrecognized text`, especially with `<br/>` tags, the issue is that Mermaid requires node labels containing special characters to be quoted.
+
+**Solution**: Wrap all node labels containing `<br/>` or other special characters in double quotes:
+
+```diff
+# ❌ This will fail:
+- NodeName[Label with<br/>line break]
++ # ✅ This will work:
++ NodeName["Label with<br/>line break"]
+
+# ❌ This will fail for database nodes:
+- DB[(Database<br/>PostgreSQL)]
++ # ✅ This will work:
++ DB[("Database<br/>PostgreSQL")]
+```
+
 **Missing text in diagrams?** Run the font fix:
 ```bash
 ./native/fix-fonts.sh
