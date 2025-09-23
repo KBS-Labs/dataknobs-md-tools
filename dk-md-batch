@@ -1,0 +1,3 @@
+#!/bin/bash
+# Convenience wrapper for dk-md-batch
+exec "$(dirname "${BASH_SOURCE[0]}")/bin/dk-md-batch" "$@"
