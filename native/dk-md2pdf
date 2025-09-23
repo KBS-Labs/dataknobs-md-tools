@@ -114,6 +114,7 @@ OPTIONS:
     --keep-html         When generating PDF, also save the intermediate HTML
     --keep-svgs         Keep SVG files as external files (default: embed in HTML)
     --show-filename     Include filename as heading in output (default: omit)
+    --overwrite         Force overwrite of existing output file
 
 EXAMPLES:
     $(basename "$0") input.md                    # Creates input.pdf
@@ -135,6 +136,7 @@ KEEP_HTML=false
 KEEP_SVGS=false
 SHOW_FILENAME=false
 FORMAT_OVERRIDE=""
+OVERWRITE=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -176,6 +178,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --show-filename)
             SHOW_FILENAME=true
+            shift
+            ;;
+        --overwrite)
+            OVERWRITE=true
             shift
             ;;
         -*)
@@ -249,6 +255,13 @@ fi
 
 # Check dependencies
 check_dependencies
+
+# Check if output file exists and overwrite protection
+if [ -f "$OUTPUT_FILE" ] && [ "$OVERWRITE" = false ]; then
+    print_error "Output file already exists: $OUTPUT_FILE"
+    echo "Use --overwrite to force overwrite"
+    exit 1
+fi
 
 # Get absolute paths
 TEMP_DIR=$(mktemp -d)

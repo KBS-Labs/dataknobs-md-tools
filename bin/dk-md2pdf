@@ -104,6 +104,7 @@ OPTIONS:
     --keep-svgs         Keep SVG files as external files (default: embed in HTML)
     --use-docker        Force Docker usage (if available)
     --use-native        Force native tools usage (if available)
+    --overwrite         Force overwrite of existing output file
 
 EXAMPLES:
     $(basename "$0") input.md                    # Creates input.pdf
