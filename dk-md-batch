@@ -1,3 +1,13 @@
 #!/bin/bash
 # Convenience wrapper for dk-md-batch
-exec "$(dirname "${BASH_SOURCE[0]}")/bin/dk-md-batch" "$@"
+# Get the directory where this script is located
+
+# Resolve symlinks to get the actual script location
+while [ -L "$SCRIPT_PATH" ]; do
+    SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+    SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+    # Handle relative symlinks
+    [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+done
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+exec "$SCRIPT_DIR/bin/dk-md-batch" "$@"
