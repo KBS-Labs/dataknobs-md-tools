@@ -545,6 +545,30 @@ elif [ "$OUTPUT_FORMAT" = "pdf" ]; then
     fi
 
     cd - >/dev/null
+
+    # If --keep-svgs is set, copy SVG files to the same directory as the PDF
+    # (even if already copied via --keep-html, this ensures they're always saved)
+    if [ "$KEEP_SVGS" = true ]; then
+        OUTPUT_DIR=$(dirname "$OUTPUT_ABS")
+        # Go back to temp dir to copy the SVGs
+        cd "$TEMP_DIR"
+
+        if [ "$VERBOSE" = true ]; then
+            echo "DEBUG: Current directory: $(pwd)" >&2
+            echo "DEBUG: TEMP_DIR: $TEMP_DIR" >&2
+            echo "DEBUG: OUTPUT_DIR: $OUTPUT_DIR" >&2
+            echo "DEBUG: Looking for SVG files:" >&2
+            ls -la processed-*.svg 2>&1 || echo "No SVG files found" >&2
+        fi
+
+        if ls processed-*.svg >/dev/null 2>&1; then
+            cp processed-*.svg "$OUTPUT_DIR/"
+            print_info "SVG files copied to output directory"
+        else
+            print_warning "No SVG files found to copy (--keep-svgs was set but no SVGs were generated)"
+        fi
+        cd "$ORIG_DIR"
+    fi
 else
     print_error "Unsupported output format: $OUTPUT_FORMAT"
     exit 1
