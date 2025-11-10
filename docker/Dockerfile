@@ -18,8 +18,13 @@ RUN apt-get update && apt-get install -y \
     fonts-noto \
     fonts-noto-cjk \
     fonts-dejavu \
+    curl \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
+
+# Install uv for Python package management
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:$PATH"
 
 # Set environment for Puppeteer/Chromium
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
@@ -28,14 +33,6 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
 # Update npm to latest version first
 RUN npm install -g npm@latest
 
-# Install Python packages in a virtual environment to avoid warnings
-RUN python3 -m venv /opt/venv && \
-    /opt/venv/bin/pip install --upgrade pip && \
-    /opt/venv/bin/pip install --no-cache-dir weasyprint
-
-# Make virtual environment available
-ENV PATH="/opt/venv/bin:$PATH"
-
 # Install mermaid-cli globally the simple way
 # The deprecation warning doesn't affect functionality
 RUN npm install -g @mermaid-js/mermaid-cli@latest
@@ -43,7 +40,14 @@ RUN npm install -g @mermaid-js/mermaid-cli@latest
 # Create app directory
 WORKDIR /app
 
-# Copy application files
+# Copy Python project files first (for better layer caching)
+COPY .python-version pyproject.toml /app/
+COPY src/python/ /app/src/python/
+
+# Install Python dependencies using uv
+RUN uv sync
+
+# Copy rest of application files
 COPY src/ /app/src/
 COPY native/dk-md2pdf /app/dk-md2pdf
 COPY docker/docker-entrypoint.sh /app/docker-entrypoint.sh

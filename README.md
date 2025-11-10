@@ -40,14 +40,14 @@ docker run --rm -v $(pwd):/workspace dataknobs/md-tools -f html input.md output.
 git clone https://github.com/KBS-Labs/dataknobs-md-tools
 cd dataknobs-md-tools
 
-# Install dependencies
+# Install dependencies (installs uv, pandoc, Node.js, mermaid-cli, Python deps)
 ./native/install.sh
 
 # Convert markdown to PDF
-./bin/dk-md2pdf input.md output.pdf
+./native/dk-md2pdf input.md output.pdf
 
 # Convert markdown to HTML (self-contained by default)
-./bin/dk-md2html input.md output.html
+./native/dk-md2pdf -f html input.md output.html
 ```
 
 ## Installation
@@ -65,7 +65,7 @@ docker build -t dataknobs/md-tools -f docker/Dockerfile .
 
 ### Native Method
 
-Installs pandoc, mermaid-cli, and weasyprint:
+Simple automated installation using `uv` for Python dependency management:
 
 ```bash
 # Clone repository
@@ -73,22 +73,36 @@ git clone https://github.com/KBS-Labs/dataknobs-md-tools
 cd dataknobs-md-tools
 
 # Run installer (supports macOS, Linux)
+# Installs: uv, pandoc, Node.js, mermaid-cli, and Python dependencies
 ./native/install.sh
 
 # Add to PATH (optional)
-export PATH="$PATH:$(pwd)/bin"
-echo 'export PATH="$PATH:'$(pwd)'/bin"' >> ~/.bashrc
+export PATH="$PATH:$(pwd)/native"
 ```
+
+The installer automatically:
+- Installs **uv** (Python package manager)
+- Installs **pandoc**, **Node.js**, and **mermaid-cli**
+- Installs Python 3.11.9 and **weasyprint** via `uv`
+- Handles all system dependencies for your OS
 
 #### Manual Installation
 
-If the installer doesn't support your system:
+If the installer doesn't work for your system:
 
-1. **Pandoc**: https://pandoc.org/installing.html
-2. **Node.js & npm**: https://nodejs.org/
-3. **Mermaid CLI**: `npm install -g @mermaid-js/mermaid-cli`
-4. **Python 3 & pip**: https://www.python.org/
-5. **WeasyPrint**: `pip install weasyprint`
+**System Dependencies:**
+1. **uv**: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+2. **Pandoc**: https://pandoc.org/installing.html
+3. **Node.js & npm**: https://nodejs.org/
+4. **Mermaid CLI**: `npm install -g @mermaid-js/mermaid-cli`
+
+**Python Dependencies:**
+```bash
+# From project root
+uv sync
+```
+
+That's it! `uv` automatically installs the correct Python version and all dependencies.
 
 ## Usage
 
