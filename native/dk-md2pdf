@@ -418,50 +418,54 @@ if [ "$OUTPUT_FORMAT" = "html" ]; then
     # Run pandoc from temp directory so it can find the SVGs
     cd "$TEMP_DIR"
 
+    # First convert to HTML
+    pandoc "processed.md" \
+           "${PANDOC_OPTS[@]}" \
+           --resource-path=".:$TEMP_DIR" \
+           -o "$OUTPUT_ABS"
+
     if [ "$KEEP_SVGS" = false ]; then
-        # Embed SVGs as base64 data URIs for self-contained HTML
+        # Inline SVGs directly as XML for self-contained HTML
         if ls processed-*.svg >/dev/null 2>&1; then
-            print_info "Embedding SVG images in HTML..."
+            print_info "Inlining SVG images in HTML..."
 
-            # Create a copy of processed.md with embedded SVGs
-            cp processed.md processed-embedded.md
+            # Use Python to inline SVGs directly as XML
+            python3 << PYTHON_SCRIPT
+import re
+import sys
+from pathlib import Path
 
-            # Replace each SVG reference with base64 data URI
-            for svg_file in processed-*.svg; do
-                if [ -f "$svg_file" ]; then
-                    # Encode SVG to base64 and create data URI
-                    base64_data=$(base64 < "$svg_file" | tr -d '\n')
-                    data_uri="data:image/svg+xml;base64,$base64_data"
+# Read the HTML file
+with open('$OUTPUT_ABS', 'r', encoding='utf-8') as f:
+    html_content = f.read()
 
-                    # Replace the reference in the markdown file
-                    # Use sed with a different delimiter to avoid issues with slashes
-                    sed -i.bak "s|\./$svg_file|$data_uri|g" processed-embedded.md
-                fi
-            done
+# Find all SVG files
+svg_files = sorted(Path('.').glob('processed-*.svg'))
 
-            # Remove backup file
-            rm -f processed-embedded.md.bak
+# Replace each SVG img reference with inline SVG content
+for svg_file in svg_files:
+    svg_filename = svg_file.name
+    # Read the SVG content
+    with open(svg_file, 'r', encoding='utf-8') as f:
+        svg_content = f.read()
 
-            # Use the embedded version for pandoc
-            # Use --self-contained for older pandoc versions
-            pandoc "processed-embedded.md" \
-                   "${PANDOC_OPTS[@]}" \
-                   --self-contained \
-                   -o "$OUTPUT_ABS"
-        else
-            # No SVGs to embed, just convert normally
-            pandoc "processed.md" \
-                   "${PANDOC_OPTS[@]}" \
-                   -o "$OUTPUT_ABS"
+    # Remove XML declaration if present
+    svg_content = re.sub(r'<\?xml[^?]*\?>\s*', '', svg_content)
+
+    # Find and replace img tags that reference this SVG
+    img_pattern = r'<img\s+src="\./' + re.escape(svg_filename) + r'"[^>]*/?>'
+
+    # Replace with inline SVG
+    html_content = re.sub(img_pattern, svg_content, html_content)
+
+# Write back
+with open('$OUTPUT_ABS', 'w', encoding='utf-8') as f:
+    f.write(html_content)
+
+PYTHON_SCRIPT
         fi
     else
-        # Keep SVGs as external files (original behavior)
-        pandoc "processed.md" \
-               "${PANDOC_OPTS[@]}" \
-               --resource-path=".:$TEMP_DIR" \
-               -o "$OUTPUT_ABS"
-
-        # Copy SVG files to the same directory as HTML
+        # Keep SVGs as external files - copy them to output directory
         OUTPUT_DIR=$(dirname "$OUTPUT_ABS")
         if ls processed-*.svg >/dev/null 2>&1; then
             cp processed-*.svg "$OUTPUT_DIR/"
@@ -484,49 +488,66 @@ elif [ "$OUTPUT_FORMAT" = "pdf" ]; then
     # Run pandoc from temp directory so it can find the SVGs
     cd "$TEMP_DIR"
 
-    # First convert to HTML
+    # First convert to HTML with SVG references
     pandoc "processed.md" \
            "${PANDOC_OPTS[@]}" \
            --resource-path=".:$TEMP_DIR" \
            -o "output.html"
 
+    # For PDF generation, we need to inline SVGs in the HTML
+    # so weasyprint can render them correctly (with fonts)
+    if ls processed-*.svg >/dev/null 2>&1; then
+        print_info "Inlining SVGs in HTML for PDF generation..."
+
+        # Use Python to inline SVGs directly as XML (not base64)
+        # This preserves font rendering in weasyprint
+        python3 << 'PYTHON_SCRIPT'
+import re
+import sys
+from pathlib import Path
+
+# Read the HTML file
+with open('output.html', 'r', encoding='utf-8') as f:
+    html_content = f.read()
+
+# Find all SVG files
+svg_files = sorted(Path('.').glob('processed-*.svg'))
+
+# Replace each SVG img reference with inline SVG content
+for svg_file in svg_files:
+    svg_filename = svg_file.name
+    # Read the SVG content
+    with open(svg_file, 'r', encoding='utf-8') as f:
+        svg_content = f.read()
+
+    # Remove XML declaration if present
+    svg_content = re.sub(r'<\?xml[^?]*\?>\s*', '', svg_content)
+
+    # Find and replace img tags that reference this SVG
+    # Pattern matches: <img src="./processed-N.svg" alt="..." />
+    img_pattern = r'<img\s+src="\./' + re.escape(svg_filename) + r'"[^>]*/?>'
+
+    # Replace with inline SVG
+    html_content = re.sub(img_pattern, svg_content, html_content)
+
+# Write back
+with open('output.html', 'w', encoding='utf-8') as f:
+    f.write(html_content)
+
+print("SVG inlining complete", file=sys.stderr)
+PYTHON_SCRIPT
+    fi
+
     # If --keep-html is set, save the HTML file
+    # Note: output.html already has embedded SVGs at this point (from Python script above)
     if [ "$KEEP_HTML" = true ]; then
         HTML_FILE="${OUTPUT_ABS%.pdf}.html"
 
-        if [ "$KEEP_SVGS" = false ]; then
-            # Embed SVGs in the HTML for a self-contained file
-            if ls processed-*.svg >/dev/null 2>&1; then
-                print_info "Creating self-contained HTML with embedded SVGs..."
+        # Save the HTML file (already has embedded SVGs for PDF generation)
+        cp "output.html" "$HTML_FILE"
 
-                # Create a copy of output.html with embedded SVGs
-                cp output.html output-embedded.html
-
-                # Replace each SVG reference with base64 data URI
-                for svg_file in processed-*.svg; do
-                    if [ -f "$svg_file" ]; then
-                        # Encode SVG to base64 and create data URI
-                        base64_data=$(base64 < "$svg_file" | tr -d '\n')
-                        data_uri="data:image/svg+xml;base64,$base64_data"
-
-                        # Replace the reference in the HTML file
-                        sed -i.bak "s|\./$svg_file|$data_uri|g" output-embedded.html
-                    fi
-                done
-
-                # Remove backup file
-                rm -f output-embedded.html.bak
-
-                # Save the embedded version
-                cp output-embedded.html "$HTML_FILE"
-            else
-                cp "output.html" "$HTML_FILE"
-            fi
-        else
-            # Keep SVGs as external files
-            cp "output.html" "$HTML_FILE"
-
-            # Copy SVG files to the same directory as HTML
+        # If --keep-svgs is set, also copy the SVG files to output directory
+        if [ "$KEEP_SVGS" = true ]; then
             OUTPUT_DIR=$(dirname "$HTML_FILE")
             if ls processed-*.svg >/dev/null 2>&1; then
                 cp processed-*.svg "$OUTPUT_DIR/"
