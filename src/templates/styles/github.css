@@ -63,6 +63,18 @@
   h3 {
     page-break-after: avoid;
   }
+
+  /* SVG sizing for PDF */
+  svg {
+    max-width: 100% !important;
+    height: auto !important;
+    page-break-inside: avoid;
+  }
+
+  /* Hide alt text captions in print */
+  img::after {
+    content: none !important;
+  }
 }
 
 body {

@@ -452,11 +452,25 @@ for svg_file in svg_files:
     # Remove XML declaration if present
     svg_content = re.sub(r'<\?xml[^?]*\?>\s*', '', svg_content)
 
+    # Remove attributes that cause issues
+    svg_content = re.sub(r'\s*aria-roledescription="[^"]*"', '', svg_content)
+    svg_content = re.sub(r'\s*role="graphics-document document"', '', svg_content)
+
+    # Remove inline width/max-width styles to allow CSS control
+    svg_content = re.sub(r'style="([^"]*?)max-width:\s*[^;"]+(;?)([^"]*)"', r'style="\1\3"', svg_content)
+    svg_content = re.sub(r'\s*width="100%"', '', svg_content)
+
+    # Add responsive sizing
+    svg_content = re.sub(r'<svg', '<svg style="max-width: 100%; height: auto;"', svg_content, count=1)
+
+    # Wrap SVG in a container div for better sizing control
+    svg_wrapped = f'<div class="svg-container" style="width: 100%; max-width: 100%; overflow-x: auto;">{svg_content}</div>'
+
     # Find and replace img tags that reference this SVG
     img_pattern = r'<img\s+src="\./' + re.escape(svg_filename) + r'"[^>]*/?>'
 
     # Replace with inline SVG
-    html_content = re.sub(img_pattern, svg_content, html_content)
+    html_content = re.sub(img_pattern, svg_wrapped, html_content)
 
 # Write back
 with open('$OUTPUT_ABS', 'w', encoding='utf-8') as f:
@@ -465,9 +479,42 @@ with open('$OUTPUT_ABS', 'w', encoding='utf-8') as f:
 PYTHON_SCRIPT
         fi
     else
-        # Keep SVGs as external files - copy them to output directory
+        # Keep SVGs as external files - clean and copy them to output directory
         OUTPUT_DIR=$(dirname "$OUTPUT_ABS")
         if ls processed-*.svg >/dev/null 2>&1; then
+            # Clean up SVG files before copying
+            python3 << 'PYTHON_SCRIPT'
+import re
+from pathlib import Path
+
+svg_files = sorted(Path('.').glob('processed-*.svg'))
+
+for svg_file in svg_files:
+    with open(svg_file, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    # Remove problematic attributes that cause "diagram" footer
+    content = re.sub(r'\s*aria-roledescription="[^"]*"', '', content)
+    content = re.sub(r'\s*role="graphics-document document"', '', content)
+
+    # Remove inline width/max-width styles to allow proper sizing
+    content = re.sub(r'\s*width="100%"', '', content)
+    content = re.sub(r'style="([^"]*?)max-width:\s*[^;"]+(;?)([^"]*)"', r'style="\1\3"', content)
+
+    # Add responsive sizing by merging with existing style or creating new one
+    if 'max-width: 100%' not in content:
+        # If there's already a style attribute, add to it
+        if re.search(r'<svg[^>]*\sstyle="', content):
+            content = re.sub(r'(<svg[^>]*\sstyle=")([^"]*)"', r'\1\2 max-width: 100%; height: auto;"', content, count=1)
+        else:
+            # Otherwise create new style attribute
+            content = re.sub(r'(<svg[^>]*?)>', r'\1 style="max-width: 100%; height: auto;">', content, count=1)
+
+    # Write cleaned version
+    with open(svg_file, 'w', encoding='utf-8') as f:
+        f.write(content)
+PYTHON_SCRIPT
+
             cp processed-*.svg "$OUTPUT_DIR/"
             print_info "SVG files copied to output directory"
         fi
@@ -513,22 +560,127 @@ with open('output.html', 'r', encoding='utf-8') as f:
 # Find all SVG files
 svg_files = sorted(Path('.').glob('processed-*.svg'))
 
-# Replace each SVG img reference with inline SVG content
-for svg_file in svg_files:
-    svg_filename = svg_file.name
-    # Read the SVG content
-    with open(svg_file, 'r', encoding='utf-8') as f:
-        svg_content = f.read()
+# Function to make SVG IDs unique
+def make_svg_ids_unique(svg_content, suffix):
+    """Make all IDs in an SVG unique by adding a suffix."""
+    # Replace id attributes: id="my-svg" -> id="my-svg-1"
+    svg_content = re.sub(r'id="my-svg', f'id="my-svg-{suffix}', svg_content)
 
-    # Remove XML declaration if present
-    svg_content = re.sub(r'<\?xml[^?]*\?>\s*', '', svg_content)
+    # Replace URL references: url(#my-svg...) -> url(#my-svg-1...)
+    svg_content = re.sub(r'url\(#my-svg', f'url(#my-svg-{suffix}', svg_content)
 
-    # Find and replace img tags that reference this SVG
-    # Pattern matches: <img src="./processed-N.svg" alt="..." />
-    img_pattern = r'<img\s+src="\./' + re.escape(svg_filename) + r'"[^>]*/?>'
+    # Replace CSS selectors: #my-svg -> #my-svg-1
+    # Use negative lookahead to avoid matching already-replaced IDs like #my-svg-1
+    svg_content = re.sub(r'#my-svg(?!-\d)', f'#my-svg-{suffix}', svg_content)
 
-    # Replace with inline SVG
-    html_content = re.sub(img_pattern, svg_content, html_content)
+    return svg_content
+
+def normalize_svg_sizing(svg_content):
+    """Normalize SVG sizing for PDF output - expand to full width, constrain tall diagrams."""
+    # Find the opening svg tag with its style attribute
+    def replace_svg_style(match):
+        full_tag = match.group(0)
+
+        # Remove the max-width pixel value from the style
+        # Change "max-width: 3467.26px;" to ""
+        modified_tag = re.sub(r'max-width:\s*[\d.]+px;?', '', full_tag)
+
+        # Add sizing styles for PDF:
+        # - width: 100% makes diagrams expand to full page width (readable text)
+        # - height: auto maintains aspect ratio
+        # - max-height: 9in constrains tall diagrams to fit on page
+        if 'style="' in modified_tag:
+            # Append to existing style
+            modified_tag = modified_tag.replace('style="', 'style="width: 100%; height: auto; max-height: 9in; ')
+        else:
+            # Add new style attribute
+            modified_tag = modified_tag.replace('>', ' style="width: 100%; height: auto; max-height: 9in;">', 1)
+
+        return modified_tag
+
+    # Match the opening <svg> tag with all its attributes
+    svg_content = re.sub(r'<svg[^>]*>', replace_svg_style, svg_content, count=1)
+
+    return svg_content
+
+# Check if HTML uses file references or base64 encoding
+import base64
+uses_base64 = bool(re.search(r'<img\s+src="data:image/svg\+xml;base64,', html_content))
+
+if uses_base64:
+    # Pandoc converted SVGs to base64 - decode and clean them
+    svg_counter = [0]  # Use list to allow modification in nested function
+
+    def replace_base64_svg(match):
+        full_tag = match.group(0)
+        base64_data = match.group(1)
+        svg_counter[0] += 1
+        try:
+            # Decode base64
+            decoded_svg = base64.b64decode(base64_data).decode('utf-8')
+
+            # Clean the decoded SVG - MINIMAL changes only
+            cleaned_svg = decoded_svg
+            cleaned_svg = re.sub(r'<\?xml[^?]*\?>\s*', '', cleaned_svg)
+            cleaned_svg = re.sub(r'\s*aria-roledescription="[^"]*"', '', cleaned_svg)
+            cleaned_svg = re.sub(r'\s*role="graphics-document document"', '', cleaned_svg)
+
+            # Make IDs unique
+            cleaned_svg = make_svg_ids_unique(cleaned_svg, svg_counter[0])
+
+            # Normalize sizing for PDF output
+            cleaned_svg = normalize_svg_sizing(cleaned_svg)
+
+            # Wrap in div container (sizing handled by CSS)
+            svg_wrapped_local = f'<div class="svg-container">{cleaned_svg}</div>'
+            return svg_wrapped_local
+        except Exception as e:
+            # If decoding fails, return original tag
+            print(f"Warning: Failed to decode base64 SVG: {e}", file=sys.stderr)
+            return full_tag
+
+    # Replace all base64-encoded SVG images
+    html_content = re.sub(r'<img\s+src="data:image/svg\+xml;base64,([^"]+)"[^>]*/?>', replace_base64_svg, html_content)
+else:
+    # Replace each SVG img file reference with inline SVG content
+    for svg_file in svg_files:
+        svg_filename = svg_file.name
+        # Extract diagram number from filename (e.g., "processed-1.svg" -> "1")
+        import re as re_module
+        diagram_num_match = re_module.search(r'processed-(\d+)\.svg', svg_filename)
+        diagram_num = diagram_num_match.group(1) if diagram_num_match else svg_filename
+
+        # Read the SVG content
+        with open(svg_file, 'r', encoding='utf-8') as f:
+            svg_content = f.read()
+
+        # Remove XML declaration if present
+        svg_content = re.sub(r'<\?xml[^?]*\?>\s*', '', svg_content)
+
+        # Remove attributes that cause issues in PDF - MINIMAL changes only
+        svg_content = re.sub(r'\s*aria-roledescription="[^"]*"', '', svg_content)
+        svg_content = re.sub(r'\s*role="graphics-document document"', '', svg_content)
+
+        # Make IDs unique
+        svg_content = make_svg_ids_unique(svg_content, diagram_num)
+
+        # Normalize sizing for PDF output
+        svg_content = normalize_svg_sizing(svg_content)
+
+        # Wrap SVG in a container div (sizing handled by CSS)
+        svg_wrapped = f'<div class="svg-container">{svg_content}</div>'
+
+        # Find and replace img tags that reference this SVG file
+        img_pattern_file = r'<img\s+src="\./' + re.escape(svg_filename) + r'"[^>]*/?>'
+        html_content = re.sub(img_pattern_file, svg_wrapped, html_content)
+
+# Remove figcaption elements that Pandoc adds for images
+# These show up as "diagram" text in the output
+html_content = re.sub(r'<figcaption[^>]*>.*?</figcaption>', '', html_content, flags=re.DOTALL)
+
+# Remove figure wrapper tags - WeasyPrint doesn't render SVGs inside figure properly
+html_content = re.sub(r'<figure>\s*', '', html_content)
+html_content = re.sub(r'\s*</figure>', '', html_content)
 
 # Write back
 with open('output.html', 'w', encoding='utf-8') as f:
@@ -546,10 +698,43 @@ PYTHON_SCRIPT
         # Save the HTML file (already has embedded SVGs for PDF generation)
         cp "output.html" "$HTML_FILE"
 
-        # If --keep-svgs is set, also copy the SVG files to output directory
+        # If --keep-svgs is set, also clean and copy the SVG files to output directory
         if [ "$KEEP_SVGS" = true ]; then
             OUTPUT_DIR=$(dirname "$HTML_FILE")
             if ls processed-*.svg >/dev/null 2>&1; then
+                # Clean up SVG files before copying
+                python3 << 'PYTHON_SCRIPT'
+import re
+from pathlib import Path
+
+svg_files = sorted(Path('.').glob('processed-*.svg'))
+
+for svg_file in svg_files:
+    with open(svg_file, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    # Remove problematic attributes that cause "diagram" footer
+    content = re.sub(r'\s*aria-roledescription="[^"]*"', '', content)
+    content = re.sub(r'\s*role="graphics-document document"', '', content)
+
+    # Remove inline width/max-width styles to allow proper sizing
+    content = re.sub(r'\s*width="100%"', '', content)
+    content = re.sub(r'style="([^"]*?)max-width:\s*[^;"]+(;?)([^"]*)"', r'style="\1\3"', content)
+
+    # Add responsive sizing by merging with existing style or creating new one
+    if 'max-width: 100%' not in content:
+        # If there's already a style attribute, add to it
+        if re.search(r'<svg[^>]*\sstyle="', content):
+            content = re.sub(r'(<svg[^>]*\sstyle=")([^"]*)"', r'\1\2 max-width: 100%; height: auto;"', content, count=1)
+        else:
+            # Otherwise create new style attribute
+            content = re.sub(r'(<svg[^>]*?)>', r'\1 style="max-width: 100%; height: auto;">', content, count=1)
+
+    # Write cleaned version
+    with open(svg_file, 'w', encoding='utf-8') as f:
+        f.write(content)
+PYTHON_SCRIPT
+
                 cp processed-*.svg "$OUTPUT_DIR/"
                 print_info "SVG files copied to output directory"
             fi
@@ -567,11 +752,11 @@ PYTHON_SCRIPT
 
     cd - >/dev/null
 
-    # If --keep-svgs is set, copy SVG files to the same directory as the PDF
+    # If --keep-svgs is set, clean and copy SVG files to the same directory as the PDF
     # (even if already copied via --keep-html, this ensures they're always saved)
     if [ "$KEEP_SVGS" = true ]; then
         OUTPUT_DIR=$(dirname "$OUTPUT_ABS")
-        # Go back to temp dir to copy the SVGs
+        # Go back to temp dir to process and copy the SVGs
         cd "$TEMP_DIR"
 
         if [ "$VERBOSE" = true ]; then
@@ -583,6 +768,40 @@ PYTHON_SCRIPT
         fi
 
         if ls processed-*.svg >/dev/null 2>&1; then
+            # Clean up SVG files before copying
+            print_info "Cleaning SVG files..."
+            python3 << 'PYTHON_SCRIPT'
+import re
+from pathlib import Path
+
+svg_files = sorted(Path('.').glob('processed-*.svg'))
+
+for svg_file in svg_files:
+    with open(svg_file, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    # Remove problematic attributes that cause "diagram" footer
+    content = re.sub(r'\s*aria-roledescription="[^"]*"', '', content)
+    content = re.sub(r'\s*role="graphics-document document"', '', content)
+
+    # Remove inline width/max-width styles to allow proper sizing
+    content = re.sub(r'\s*width="100%"', '', content)
+    content = re.sub(r'style="([^"]*?)max-width:\s*[^;"]+(;?)([^"]*)"', r'style="\1\3"', content)
+
+    # Add responsive sizing by merging with existing style or creating new one
+    if 'max-width: 100%' not in content:
+        # If there's already a style attribute, add to it
+        if re.search(r'<svg[^>]*\sstyle="', content):
+            content = re.sub(r'(<svg[^>]*\sstyle=")([^"]*)"', r'\1\2 max-width: 100%; height: auto;"', content, count=1)
+        else:
+            # Otherwise create new style attribute
+            content = re.sub(r'(<svg[^>]*?)>', r'\1 style="max-width: 100%; height: auto;">', content, count=1)
+
+    # Write cleaned version
+    with open(svg_file, 'w', encoding='utf-8') as f:
+        f.write(content)
+PYTHON_SCRIPT
+
             cp processed-*.svg "$OUTPUT_DIR/"
             print_info "SVG files copied to output directory"
         else
