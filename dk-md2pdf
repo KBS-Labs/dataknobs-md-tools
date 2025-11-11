@@ -2,6 +2,7 @@
 # Convenience wrapper for dk-md2pdf
 
 # Resolve symlinks to get the actual script location
+SCRIPT_PATH="$0"
 while [ -L "$SCRIPT_PATH" ]; do
     SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
     SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"

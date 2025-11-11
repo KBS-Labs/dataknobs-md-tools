@@ -82,11 +82,28 @@ check_native() {
         fi
     fi
 
-    if command -v pandoc >/dev/null 2>&1 && \
-       command -v mmdc >/dev/null 2>&1 && \
-       command -v weasyprint >/dev/null 2>&1; then
+    # Check for required tools
+    if ! command -v pandoc >/dev/null 2>&1; then
+        return 1
+    fi
+
+    if ! command -v mmdc >/dev/null 2>&1; then
+        return 1
+    fi
+
+    # Check for weasyprint via uv or globally
+    if command -v uv >/dev/null 2>&1; then
+        # Check if weasyprint is available via uv
+        if (cd "$PROJECT_ROOT" && uv run python3 -c "import weasyprint" 2>/dev/null); then
+            return 0
+        fi
+    fi
+
+    # Fall back to checking for global weasyprint
+    if command -v weasyprint >/dev/null 2>&1; then
         return 0
     fi
+
     return 1
 }
 
