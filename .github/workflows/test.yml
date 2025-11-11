@@ -105,6 +105,40 @@ jobs:
           ./bin/dk-md2html examples/basic.md wrapper.html
           test -f wrapper.html
 
+  test-python:
+    runs-on: ubuntu-latest
+    name: Test Python Unit Tests
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: |
+          uv sync --all-extras
+
+      - name: Run pytest
+        run: |
+          uv run pytest tests/ -v --tb=short
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pytest-results
+          path: |
+            .coverage
+            htmlcov/
+
   validate-examples:
     runs-on: ubuntu-latest
     name: Validate Example Files
