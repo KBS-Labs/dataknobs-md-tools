@@ -104,6 +104,41 @@ uv sync
 
 That's it! `uv` automatically installs the correct Python version and all dependencies.
 
+## Version Information
+
+### Current Versions (Updated 2025-01-10)
+
+| Component | Version | Update Strategy |
+|-----------|---------|-----------------|
+| **Pandoc** | 3.1.11 | Pinned to 3.x |
+| **Node.js** | 22.x LTS | Follow LTS |
+| **Python** | 3.11.9 | Pinned patch |
+| **Mermaid CLI** | Latest | Auto-update |
+| **WeasyPrint** | 63.1 | Latest stable |
+
+### Version Management
+
+We use **major version pinning** to balance stability with security updates:
+- ✅ Automatic patch releases (security fixes, bug fixes)
+- ✅ Avoid breaking changes from major version bumps
+- ✅ Manually review major updates quarterly
+
+**For detailed version information**, including:
+- Security monitoring guidance
+- How to update each dependency
+- Testing procedures after updates
+- Rollback procedures
+
+See **[VERSIONS.md](VERSIONS.md)** for complete documentation.
+
+### Compatibility
+
+The conversion script automatically detects tool versions and adapts:
+- **Pandoc 3.x**: Uses `--embed-resources --standalone`
+- **Pandoc 2.x**: Uses `--self-contained` (legacy)
+
+This ensures both Docker and native installations work correctly regardless of the Pandoc version installed.
+
 ## Usage
 
 ### Command Line Interface

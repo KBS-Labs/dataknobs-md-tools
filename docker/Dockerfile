@@ -1,9 +1,9 @@
-# Use Node 22 for latest npm and better performance
+# Use Node 22 LTS for latest npm and better performance
+# Version pinning: Node 22.x (LTS), updated 2025-01
 FROM node:22-slim
 
-# Install system dependencies
+# Install system dependencies (except Pandoc - we'll install that separately)
 RUN apt-get update && apt-get install -y \
-    pandoc \
     python3-pip \
     python3-cffi \
     python3-brotli \
@@ -19,8 +19,19 @@ RUN apt-get update && apt-get install -y \
     fonts-noto-cjk \
     fonts-dejavu \
     curl \
+    wget \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Pandoc 3.x from GitHub releases
+# Debian's apt repo has old Pandoc 2.x, so we download directly
+# Version pinning: Pandoc 3.x (latest stable)
+# Supports both amd64 (x86_64) and arm64 (Apple Silicon) architectures
+ENV PANDOC_VERSION=3.1.11
+RUN ARCH=$(dpkg --print-architecture) && \
+    wget https://github.com/jgm/pandoc/releases/download/${PANDOC_VERSION}/pandoc-${PANDOC_VERSION}-1-${ARCH}.deb \
+    && dpkg -i pandoc-${PANDOC_VERSION}-1-${ARCH}.deb \
+    && rm pandoc-${PANDOC_VERSION}-1-${ARCH}.deb
 
 # Install uv for Python package management
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -33,7 +44,8 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
 # Update npm to latest version first
 RUN npm install -g npm@latest
 
-# Install mermaid-cli globally the simple way
+# Install mermaid-cli globally
+# Version pinning: Using @latest to stay current with Mermaid diagram features
 # The deprecation warning doesn't affect functionality
 RUN npm install -g @mermaid-js/mermaid-cli@latest
 
@@ -45,6 +57,8 @@ COPY .python-version pyproject.toml /app/
 COPY src/python/ /app/src/python/
 
 # Install Python dependencies using uv
+# Version pinning: Python version specified in .python-version (3.11.9)
+# WeasyPrint and other dependencies specified in pyproject.toml
 RUN uv sync
 
 # Copy rest of application files

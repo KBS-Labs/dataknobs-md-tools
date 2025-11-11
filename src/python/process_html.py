@@ -34,12 +34,15 @@ def process_html_file(html_path: str) -> None:
     # Find all SVG files in the same directory
     svg_files = sorted(html_file.parent.glob('processed-*.svg'))
     
-    # Check if HTML uses file references or base64 encoding
-    # Look for src attribute anywhere in img tags (may have other attributes before it)
+    # Check if HTML has embedded SVG tags, file references, or base64 encoding
+    # Different Pandoc versions handle resources differently:
+    # - Pandoc 2.x with --self-contained: base64-encodes SVGs in img tags
+    # - Pandoc 3.x with --embed-resources: directly embeds SVGs as <svg> tags
     uses_base64 = bool(re.search(r'<img\s+[^>]*?src="data:image/svg\+xml;base64,', html_content))
-    
+    has_embedded_svgs = bool(re.search(r'<svg[^>]*>', html_content))
+
     if uses_base64:
-        # Pandoc converted SVGs to base64 - decode and clean them
+        # Pandoc 2.x with --self-contained: decode base64-encoded SVGs
         svg_counter = [0]  # Use list to allow modification in nested function
         
         def replace_base64_svg(match):
@@ -67,6 +70,27 @@ def process_html_file(html_path: str) -> None:
             r'<img\s+[^>]*?src="data:image/svg\+xml;base64,([^"]+)"[^>]*/?>',
             replace_base64_svg,
             html_content
+        )
+    elif has_embedded_svgs:
+        # Pandoc 3.x with --embed-resources: process embedded <svg> tags
+        svg_counter = [0]
+
+        def process_embedded_svg(match):
+            svg_counter[0] += 1
+            svg_tag = match.group(0)
+
+            # Apply our sizing normalization
+            processed_svg = normalize_svg_sizing(svg_tag)
+
+            # Wrap in container div
+            return f'<div class="svg-container">{processed_svg}</div>'
+
+        # Process all <svg> tags
+        html_content = re.sub(
+            r'<svg[^>]*>.*?</svg>',
+            process_embedded_svg,
+            html_content,
+            flags=re.DOTALL
         )
     else:
         # Replace each SVG img file reference with inline SVG content
