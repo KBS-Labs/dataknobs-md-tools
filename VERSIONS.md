@@ -179,7 +179,7 @@ If an update causes issues:
 
 1. **Docker:**
    - Revert `PANDOC_VERSION` in `docker/Dockerfile`
-   - Rebuild: `docker build -t dataknobs/md-tools -f docker/Dockerfile .`
+   - Rebuild: `DOCKER_BUILDKIT=1 docker build -t dataknobs/md-tools -f docker/Dockerfile .`
 
 2. **Python packages:**
    - Git revert changes to `pyproject.toml` and `uv.lock`
