@@ -7,6 +7,7 @@ Convert Markdown files with Mermaid diagrams to beautiful PDF and HTML documents
 - 📝 **Full Markdown Support** - All standard Markdown features
 - 📊 **Mermaid Diagrams** - Flowcharts, sequence diagrams, Gantt charts, and more
 - 🎨 **Multiple Themes** - GitHub, Academic, and Minimal styles
+- 🔤 **Font Customization** - Choose fonts and sizes for body text and code
 - 📄 **Multiple Formats** - Generate PDF and HTML outputs
 - 🐳 **Docker Support** - Run without installing dependencies
 - 🚀 **Fast & Lightweight** - Efficient conversion pipeline
@@ -24,7 +25,7 @@ For now, build locally:
 # Clone and build the image locally
 git clone https://github.com/KBS-Labs/dataknobs-md-tools
 cd dataknobs-md-tools
-docker build -t dataknobs/md-tools -f docker/Dockerfile .
+DOCKER_BUILDKIT=1 docker build -t dataknobs/md-tools -f docker/Dockerfile .
 
 # Convert markdown to PDF
 docker run --rm -v $(pwd):/workspace dataknobs/md-tools input.md output.pdf
@@ -60,8 +61,26 @@ Requires only Docker installed on your system:
 # Clone and build locally (Docker Hub coming soon!)
 git clone https://github.com/KBS-Labs/dataknobs-md-tools
 cd dataknobs-md-tools
-docker build -t dataknobs/md-tools -f docker/Dockerfile .
+
+# Option 1: Use the build script (automatically uses buildx if available)
+./build-docker.sh
+
+# Option 2: Build manually with buildx (recommended, no deprecation warnings)
+docker buildx build -t dataknobs/md-tools -f docker/Dockerfile . --load
+
+# Option 3: Build with legacy builder (shows deprecation warning)
+DOCKER_BUILDKIT=1 docker build -t dataknobs/md-tools -f docker/Dockerfile .
 ```
+
+**Note:** If you get "unknown command: docker buildx", install it:
+- **macOS (Homebrew):** `brew install docker-buildx`
+- **Linux:** Install from [Docker buildx releases](https://github.com/docker/buildx/releases)
+- **Colima users:** Add to `~/.docker/config.json`:
+  ```json
+  {
+    "cliPluginsExtraDirs": ["/opt/homebrew/lib/docker/cli-plugins"]
+  }
+  ```
 
 ### Native Method
 
@@ -158,13 +177,18 @@ dk-md2pdf [OPTIONS] input.md [output]
 |--------|-------------|---------|
 | `-h, --help` | Show help message | - |
 | `-f, --format` | Force output format: `pdf` or `html` | auto-detect |
-| `-t, --theme` | CSS theme: `github`, `academic`, `minimal` | `github` |
+| `-t, --theme` | CSS theme: `github`, `academic`, `minimal`, `business` | `github` |
 | `--toc` | Include table of contents | disabled |
 | `--no-mermaid` | Skip Mermaid diagram processing | disabled |
 | `--standalone` | Create self-contained HTML with embedded CSS | disabled |
 | `--keep-html` | When generating PDF, also save intermediate HTML | disabled |
 | `--keep-svgs` | Keep SVG files as external files (HTML only) | embed in HTML |
 | `-v, --verbose` | Enable verbose output | disabled |
+| `--list-fonts` | List all available fonts and exit | - |
+| `--font-body FONT` | Font for body text (e.g., "Georgia") | system default |
+| `--font-code FONT` | Font for code blocks (e.g., "Monaco") | system default |
+| `--font-size SIZE` | Base font size in pixels | 16 |
+| `--font-size-print SIZE` | Print font size (e.g., "11pt") | 12pt |
 
 ### Examples
 
@@ -187,6 +211,18 @@ dk-md2pdf -t academic --toc paper.md
 
 # Self-contained HTML with embedded CSS and images
 dk-md2pdf --standalone --toc report.md report.html
+
+# List available fonts
+dk-md2pdf --list-fonts
+
+# Use custom fonts
+dk-md2pdf --font-body "Georgia" --font-code "Monaco" input.md output.pdf
+
+# Customize font sizes
+dk-md2pdf --font-size 14 --font-size-print 11pt input.md output.pdf
+
+# Combine font options with theme
+dk-md2pdf -t academic --font-body "Liberation Serif" --font-code "Liberation Mono" paper.md
 ```
 
 ### Global Installation
@@ -212,6 +248,89 @@ Professional appearance suitable for papers, reports, and formal documents. Feat
 
 ### Minimal
 Simple, distraction-free design focusing on readability. Ideal for basic documents and printing.
+
+### Business
+Compact, professional styling optimized for business documents. Features clean Liberation Sans font, professional blue color scheme, compact spacing, and polished table formatting. Perfect for reports, proposals, and corporate documentation.
+
+## Font Management
+
+DataKnobs MD Tools provides comprehensive font management capabilities for customizing the appearance of your documents.
+
+### Quick Start
+
+```bash
+# List all available fonts
+dk-fonts list
+
+# Search for specific fonts
+dk-fonts search "Arial"
+
+# Check if a font is available
+dk-fonts validate "Georgia"
+
+# See font system information
+dk-fonts info
+```
+
+### Font Customization
+
+Customize fonts in your documents using command-line options:
+
+```bash
+# Use custom body and code fonts
+dk-md2pdf --font-body "Georgia" --font-code "Monaco" input.md output.pdf
+
+# Adjust font sizes
+dk-md2pdf --font-size 14 --font-size-print 11pt input.md output.pdf
+
+# Combine with themes
+dk-md2pdf -t academic --font-body "Liberation Serif" paper.md
+```
+
+### Installing Additional Fonts
+
+**Native Mode:**
+```bash
+# Install recommended font families
+dk-fonts install liberation    # Liberation Sans, Serif, Mono
+dk-fonts install noto          # Noto Sans, Serif, Mono, CJK
+dk-fonts install roboto        # Google Roboto
+dk-fonts install all           # Install all recommended fonts
+
+# Install custom fonts
+dk-fonts install custom ~/Downloads/MyFont.ttf
+```
+
+**Docker Mode:**
+
+The Docker image includes a comprehensive set of pre-installed fonts:
+- Liberation (Sans, Serif, Mono)
+- Noto (Sans, Serif, Mono, CJK)
+- DejaVu (Sans, Serif, Mono)
+- Roboto
+
+For custom fonts in Docker, mount a fonts directory:
+```bash
+docker run -v ~/my-fonts:/usr/local/share/fonts/custom \
+           -v $(pwd):/workspace dataknobs/md-tools \
+           --font-body "MyCustomFont" input.md output.pdf
+```
+
+### Font Recommendations
+
+**For cross-platform compatibility:**
+- Body: Liberation Sans or Liberation Serif
+- Code: Liberation Mono
+
+**For modern documents:**
+- Body: Roboto or Noto Sans
+- Code: DejaVu Sans Mono
+
+**For academic/formal documents:**
+- Body: Liberation Serif or Noto Serif
+- Code: Liberation Mono
+
+For complete font management documentation, see **[FONTS.md](FONTS.md)**.
 
 ## HTML Output Features
 
@@ -341,7 +460,7 @@ function convertMarkdown(input, output, theme = 'github') {
 docker info
 
 # Build image locally if pull fails
-docker build -t dataknobs/md-tools -f docker/Dockerfile .
+DOCKER_BUILDKIT=1 docker build -t dataknobs/md-tools -f docker/Dockerfile .
 
 # Run with more memory if needed
 docker run --rm -m 1g -v $(pwd):/workspace dataknobs/md-tools input.md

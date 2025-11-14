@@ -120,7 +120,7 @@ Usage: $(basename "$0") [OPTIONS] input.md [output]
 OPTIONS:
     -h, --help          Show this help message
     -f, --format        Force output format: pdf or html (auto-detected from extension)
-    -t, --theme         CSS theme: github (default), academic, minimal
+    -t, --theme         CSS theme: github (default), academic, minimal, business
     -v, --verbose       Enable verbose output
     --no-mermaid        Skip Mermaid diagram processing
     --toc               Include table of contents
@@ -130,6 +130,11 @@ OPTIONS:
     --use-docker        Force Docker usage (if available)
     --use-native        Force native tools usage (if available)
     --overwrite         Force overwrite of existing output file
+    --list-fonts        List available fonts and exit
+    --font-body FONT    Font for body text (e.g., "Georgia", "Arial")
+    --font-code FONT    Font for code blocks (e.g., "Monaco", "Courier")
+    --font-size SIZE    Base font size in pixels (default: 16)
+    --font-size-print SIZE  Print font size in points (default: 12pt)
 
 EXAMPLES:
     $(basename "$0") input.md                    # Creates input.pdf
@@ -138,6 +143,9 @@ EXAMPLES:
     $(basename "$0") --keep-html input.md        # Creates both .pdf and .html
     $(basename "$0") --keep-svgs input.md out.html # HTML with external SVGs
     $(basename "$0") -t academic --toc input.md  # Academic style with TOC
+    $(basename "$0") --list-fonts                # List all available fonts
+    $(basename "$0") --font-body "Georgia" --font-code "Monaco" input.md # Custom fonts
+    $(basename "$0") --font-size 14 input.md     # Larger font size
 
 INSTALLATION:
     Docker method (recommended):

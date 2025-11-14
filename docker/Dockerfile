@@ -13,15 +13,24 @@ RUN apt-get update && apt-get install -y \
     libharfbuzz0b \
     libpangocairo-1.0-0 \
     chromium \
+    fontconfig \
     fonts-liberation \
     fonts-liberation2 \
     fonts-noto \
     fonts-noto-cjk \
+    fonts-noto-mono \
     fonts-dejavu \
+    fonts-dejavu-core \
+    fonts-dejavu-extra \
+    fonts-roboto \
+    fonts-roboto-unhinted \
     curl \
     wget \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
+
+# Refresh font cache
+RUN fc-cache -f -v
 
 # Install Pandoc 3.x from GitHub releases
 # Debian's apt repo has old Pandoc 2.x, so we download directly
@@ -64,6 +73,7 @@ RUN uv sync
 # Copy rest of application files
 COPY src/ /app/src/
 COPY native/dk-md2pdf /app/dk-md2pdf
+COPY bin/dk-fonts /app/dk-fonts
 COPY docker/docker-entrypoint.sh /app/docker-entrypoint.sh
 COPY docker/puppeteer-config.json /app/src/config/puppeteer-config.json
 COPY docker/.puppeteerrc.cjs /app/.puppeteerrc.cjs
@@ -72,7 +82,10 @@ COPY docker/.puppeteerrc.cjs /app/.puppeteerrc.cjs
 COPY docker/.puppeteerrc.cjs /.puppeteerrc.cjs
 
 # Make scripts executable
-RUN chmod +x /app/dk-md2pdf /app/docker-entrypoint.sh
+RUN chmod +x /app/dk-md2pdf /app/dk-fonts /app/docker-entrypoint.sh
+
+# Add dk-fonts to PATH (via symlink in /usr/local/bin)
+RUN ln -s /app/dk-fonts /usr/local/bin/dk-fonts
 
 # Create workspace directory
 WORKDIR /workspace

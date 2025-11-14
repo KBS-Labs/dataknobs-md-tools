@@ -126,7 +126,7 @@ Output format is auto-detected from file extension (.html/.htm for HTML, .pdf fo
 OPTIONS:
     -h, --help          Show this help message
     -f, --format        Force output format: pdf or html (overrides extension)
-    -t, --theme         CSS theme: github (default), academic, minimal
+    -t, --theme         CSS theme: github (default), academic, minimal, business
     -v, --verbose       Enable verbose output
     --no-mermaid        Skip Mermaid diagram processing
     --toc               Include table of contents
@@ -135,6 +135,11 @@ OPTIONS:
     --keep-svgs         Keep SVG files as external files (default: embed in HTML)
     --show-filename     Include filename as heading in output (default: omit)
     --overwrite         Force overwrite of existing output file
+    --list-fonts        List available fonts and exit
+    --font-body FONT    Font for body text (e.g., "Georgia", "Arial")
+    --font-code FONT    Font for code blocks (e.g., "Monaco", "Courier")
+    --font-size SIZE    Base font size in pixels (default: 16)
+    --font-size-print SIZE  Print font size in points (default: 12pt)
 
 EXAMPLES:
     $(basename "$0") input.md                    # Creates input.pdf
@@ -144,6 +149,9 @@ EXAMPLES:
     $(basename "$0") --keep-svgs input.md out.html # HTML with external SVG files
     $(basename "$0") -f html input.md output     # Force HTML despite no extension
     $(basename "$0") -t academic --toc input.md  # Academic style with TOC
+    $(basename "$0") --list-fonts                # List all available fonts
+    $(basename "$0") --font-body "Georgia" --font-code "Monaco" input.md # Custom fonts
+    $(basename "$0") --font-size 14 input.md     # Larger font size
 
 EOF
 }
@@ -157,6 +165,11 @@ KEEP_SVGS=false
 SHOW_FILENAME=false
 FORMAT_OVERRIDE=""
 OVERWRITE=false
+FONT_BODY=""
+FONT_CODE=""
+FONT_SIZE=""
+FONT_SIZE_PRINT=""
+LIST_FONTS=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -204,6 +217,26 @@ while [[ $# -gt 0 ]]; do
             OVERWRITE=true
             shift
             ;;
+        --list-fonts)
+            LIST_FONTS=true
+            shift
+            ;;
+        --font-body)
+            FONT_BODY="$2"
+            shift 2
+            ;;
+        --font-code)
+            FONT_CODE="$2"
+            shift 2
+            ;;
+        --font-size)
+            FONT_SIZE="$2"
+            shift 2
+            ;;
+        --font-size-print)
+            FONT_SIZE_PRINT="$2"
+            shift 2
+            ;;
         -*)
             print_error "Unknown option: $1"
             usage
@@ -223,6 +256,35 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# Handle --list-fonts option (exit early)
+if [ "$LIST_FONTS" = true ]; then
+    if command -v uv >/dev/null 2>&1; then
+        cd "$PROJECT_ROOT"
+        exec uv run python3 -m python.font_manager list
+    else
+        exec python3 -m python.font_manager list
+    fi
+fi
+
+# Validate fonts if specified
+if [ -n "$FONT_BODY" ]; then
+    if command -v uv >/dev/null 2>&1; then
+        if ! (cd "$PROJECT_ROOT" && uv run python3 -m python.font_manager validate "$FONT_BODY" 2>&1); then
+            print_error "Invalid body font: $FONT_BODY"
+            exit 1
+        fi
+    fi
+fi
+
+if [ -n "$FONT_CODE" ]; then
+    if command -v uv >/dev/null 2>&1; then
+        if ! (cd "$PROJECT_ROOT" && uv run python3 -m python.font_manager validate "$FONT_CODE" 2>&1); then
+            print_error "Invalid code font: $FONT_CODE"
+            exit 1
+        fi
+    fi
+fi
 
 # Validate input
 if [ -z "$INPUT_FILE" ]; then
@@ -416,6 +478,75 @@ if [ -f "$CSS_PATH" ]; then
     else
         # Link to CSS for regular HTML
         PANDOC_OPTS+=(--css="$CSS_PATH")
+    fi
+fi
+
+# Generate custom font CSS if font options are specified
+if [ -n "$FONT_BODY" ] || [ -n "$FONT_CODE" ] || [ -n "$FONT_SIZE" ] || [ -n "$FONT_SIZE_PRINT" ]; then
+    CUSTOM_CSS_PATH="$TEMP_DIR/custom-fonts.css"
+
+    cat > "$CUSTOM_CSS_PATH" << EOF
+/* Custom Font Overrides */
+
+EOF
+
+    # Override body font
+    if [ -n "$FONT_BODY" ]; then
+        cat >> "$CUSTOM_CSS_PATH" << EOF
+body,
+.markdown-body {
+    font-family: "$FONT_BODY", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif !important;
+}
+
+EOF
+    fi
+
+    # Override code font
+    if [ -n "$FONT_CODE" ]; then
+        cat >> "$CUSTOM_CSS_PATH" << EOF
+code,
+pre,
+.markdown-body code,
+.markdown-body pre code {
+    font-family: "$FONT_CODE", SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace !important;
+}
+
+EOF
+    fi
+
+    # Override font size
+    if [ -n "$FONT_SIZE" ]; then
+        cat >> "$CUSTOM_CSS_PATH" << EOF
+body,
+.markdown-body {
+    font-size: ${FONT_SIZE}px !important;
+}
+
+EOF
+    fi
+
+    # Override print font size
+    if [ -n "$FONT_SIZE_PRINT" ]; then
+        cat >> "$CUSTOM_CSS_PATH" << EOF
+@media print {
+    body,
+    .markdown-body {
+        font-size: ${FONT_SIZE_PRINT} !important;
+    }
+}
+
+EOF
+    fi
+
+    # Add custom CSS to pandoc options
+    PANDOC_OPTS+=(--css="$CUSTOM_CSS_PATH")
+
+    if [ "$VERBOSE" = true ]; then
+        print_info "Using custom fonts:"
+        [ -n "$FONT_BODY" ] && echo "  Body: $FONT_BODY"
+        [ -n "$FONT_CODE" ] && echo "  Code: $FONT_CODE"
+        [ -n "$FONT_SIZE" ] && echo "  Size: ${FONT_SIZE}px"
+        [ -n "$FONT_SIZE_PRINT" ] && echo "  Print: $FONT_SIZE_PRINT"
     fi
 fi
 

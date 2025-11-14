@@ -32,5 +32,5 @@ WORKDIR /workspace
 CMD ["bash"]
 
 # Usage:
-# docker build -t dataknobs-md-tools -f docker/Dockerfile.example .
+# DOCKER_BUILDKIT=1 docker build -t dataknobs-md-tools -f docker/Dockerfile.example .
 # docker run -v $(pwd):/workspace dataknobs-md-tools /app/bin/dk-md2pdf input.md output.pdf
