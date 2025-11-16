@@ -447,6 +447,7 @@ fi
 # Step 2: Set up pandoc options
 PANDOC_OPTS=()
 PANDOC_OPTS+=(--standalone)
+PANDOC_OPTS+=(--from markdown+task_lists)
 
 # Add TOC if requested
 if [ "$INCLUDE_TOC" = true ]; then
@@ -570,8 +571,10 @@ if [ "$OUTPUT_FORMAT" = "html" ]; then
     cd "$TEMP_DIR"
 
     # First convert to HTML
+    # Use KaTeX for math rendering in HTML (includes from CDN)
     pandoc "processed.md" \
            "${PANDOC_OPTS[@]}" \
+           --katex \
            --resource-path=".:$TEMP_DIR" \
            -o "$OUTPUT_ABS"
 
@@ -687,8 +690,10 @@ elif [ "$OUTPUT_FORMAT" = "pdf" ]; then
     cd "$TEMP_DIR"
 
     # First convert to HTML with SVG references
+    # Use webtex for math rendering in PDF (converts to images)
     pandoc "processed.md" \
            "${PANDOC_OPTS[@]}" \
+           --webtex \
            --resource-path=".:$TEMP_DIR" \
            -o "output.html"
 

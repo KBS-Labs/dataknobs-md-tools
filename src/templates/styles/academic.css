@@ -116,6 +116,52 @@ body {
   margin-bottom: 6pt;
 }
 
+/* Task list (checkbox) styling */
+.markdown-body ul.task-list {
+  list-style-type: none;
+  padding-left: 0;
+}
+
+.markdown-body ul.task-list li {
+  list-style-type: none;
+  padding-left: 1.27cm;
+}
+
+.markdown-body ul.task-list li label {
+  display: inline;
+}
+
+.markdown-body ul.task-list input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  width: 1em;
+  height: 1em;
+  border: 1.5px solid #000000;
+  border-radius: 2pt;
+  margin: 0 0.5em 0 -1.27cm;
+  vertical-align: text-bottom;
+  position: relative;
+  display: inline-block;
+  background-color: #fff;
+  pointer-events: none;
+}
+
+.markdown-body ul.task-list input[type="checkbox"]:checked {
+  background-color: #000000;
+  border-color: #000000;
+}
+
+.markdown-body ul.task-list input[type="checkbox"]:checked::before {
+  content: "✓";
+  position: absolute;
+  color: #fff;
+  font-size: 0.85em;
+  font-weight: bold;
+  left: 0.1em;
+  top: -0.1em;
+}
+
 /* Blockquotes */
 .markdown-body blockquote {
   margin: 12pt 0;

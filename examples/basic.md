@@ -22,6 +22,14 @@ You can make text **bold** or *italic* or ***both***. You can also use ~~striket
    2. Sub-step B
 3. Third step
 
+### Task List (Checkboxes)
+- [ ] Uncompleted task
+- [x] Completed task
+- [ ] Another uncompleted task
+  - [x] Completed subtask
+  - [ ] Uncompleted subtask
+- [x] Task with **bold** and *italic* text
+
 ## Links and Images
 
 Here's a [link to GitHub](https://github.com).
