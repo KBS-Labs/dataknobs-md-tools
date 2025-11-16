@@ -447,6 +447,7 @@ fi
 # Step 2: Set up pandoc options
 PANDOC_OPTS=()
 PANDOC_OPTS+=(--standalone)
+PANDOC_OPTS+=(--from markdown+task_lists)
 
 # Add TOC if requested
 if [ "$INCLUDE_TOC" = true ]; then
