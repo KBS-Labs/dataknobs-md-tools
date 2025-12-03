@@ -29,26 +29,21 @@ jobs:
               - 'native/dk-md2pdf'
               - 'pyproject.toml'
               - '.python-version'
-              - '.github/workflows/test.yml'
             native:
               - 'native/**'
               - 'bin/**'
               - 'src/**'
               - 'pyproject.toml'
               - '.python-version'
-              - '.github/workflows/test.yml'
             python:
               - 'src/python/**'
               - 'tests/test_*.py'
               - 'pyproject.toml'
               - '.python-version'
-              - '.github/workflows/test.yml'
             tests:
               - 'tests/**'
-              - '.github/workflows/test.yml'
             examples:
               - 'examples/**'
-              - '.github/workflows/test.yml'
 
   test-native:
     needs: changes
