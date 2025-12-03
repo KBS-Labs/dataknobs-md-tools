@@ -15,6 +15,7 @@ NC='\033[0m' # No Color
 TESTS_RUN=0
 TESTS_PASSED=0
 TESTS_FAILED=0
+TESTS_SKIPPED=0
 
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -108,13 +109,14 @@ test_mermaid_uses_helper() {
 test_npm_prefix_detection_live() {
     local test_name="npm prefix detection works (live)"
 
-    TESTS_RUN=$((TESTS_RUN + 1))
-    print_test "$test_name"
-
     if ! command -v npm >/dev/null 2>&1; then
+        TESTS_SKIPPED=$((TESTS_SKIPPED + 1))
         echo -e "${YELLOW}[SKIP]${NC} $test_name (npm not installed)"
         return 0
     fi
+
+    TESTS_RUN=$((TESTS_RUN + 1))
+    print_test "$test_name"
 
     # Replicate the logic from install.sh
     NPM_PREFIX=$(npm config get prefix 2>/dev/null || echo "/usr/local")
@@ -153,6 +155,9 @@ echo ""
 echo -e "Tests run:    $TESTS_RUN"
 echo -e "Tests passed: ${GREEN}$TESTS_PASSED${NC}"
 echo -e "Tests failed: ${RED}$TESTS_FAILED${NC}"
+if [ $TESTS_SKIPPED -gt 0 ]; then
+    echo -e "Tests skipped: ${YELLOW}$TESTS_SKIPPED${NC}"
+fi
 echo ""
 
 if [ $TESTS_FAILED -eq 0 ]; then
