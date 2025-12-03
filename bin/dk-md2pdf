@@ -254,8 +254,67 @@ if [ "$USE_METHOD" = "docker" ]; then
         }
     fi
 
+    # Build Docker run arguments
+    DOCKER_ARGS=(--rm)
+
+    # Add user/group mapping on Linux for proper file permissions
+    if [[ "$OSTYPE" == "linux"* ]]; then
+        DOCKER_ARGS+=(--user "$(id -u):$(id -g)")
+    fi
+
+    # Process arguments to find input/output files and convert to container paths
+    # We need to mount directories containing referenced files
+    MOUNT_DIRS=()
+    CONVERTED_ARGS=()
+    CWD="$(pwd)"
+
+    for arg in "${FILTERED_ARGS[@]}"; do
+        # Check if argument looks like a file path (exists or has common extensions)
+        if [[ -e "$arg" ]] || [[ "$arg" =~ \.(md|pdf|html|htm)$ ]]; then
+            # Convert to absolute path
+            if [[ "$arg" = /* ]]; then
+                ABS_PATH="$arg"
+            else
+                ABS_PATH="$CWD/$arg"
+            fi
+            # Normalize the path (resolve .., etc.)
+            ABS_PATH="$(cd "$(dirname "$ABS_PATH")" 2>/dev/null && pwd)/$(basename "$ABS_PATH")" 2>/dev/null || ABS_PATH="$arg"
+
+            # Get the directory containing the file
+            FILE_DIR="$(dirname "$ABS_PATH")"
+
+            # Check if this directory is already covered by an existing mount
+            ALREADY_MOUNTED=false
+            for mounted in "${MOUNT_DIRS[@]}"; do
+                if [[ "$FILE_DIR" == "$mounted"* ]]; then
+                    ALREADY_MOUNTED=true
+                    break
+                fi
+            done
+
+            if [ "$ALREADY_MOUNTED" = false ] && [ -d "$FILE_DIR" ]; then
+                MOUNT_DIRS+=("$FILE_DIR")
+            fi
+
+            # Convert to container path: mount dir becomes /mnt/hostpath
+            CONTAINER_PATH="/mnt${ABS_PATH}"
+            CONVERTED_ARGS+=("$CONTAINER_PATH")
+        else
+            CONVERTED_ARGS+=("$arg")
+        fi
+    done
+
+    # Always mount current directory as /workspace (default working dir)
+    DOCKER_ARGS+=(-v "$CWD:/workspace")
+
+    # Mount additional directories needed for file access
+    for dir in "${MOUNT_DIRS[@]}"; do
+        # Mount each directory at /mnt + its absolute path
+        DOCKER_ARGS+=(-v "$dir:/mnt$dir")
+    done
+
     # Run with Docker
-    exec docker run --rm -v "$(pwd):/workspace" dataknobs/md-tools "${FILTERED_ARGS[@]}"
+    exec docker run "${DOCKER_ARGS[@]}" dataknobs/md-tools "${CONVERTED_ARGS[@]}"
 else
     # Run with native tools
     exec "$PROJECT_ROOT/native/dk-md2pdf" "${FILTERED_ARGS[@]}"

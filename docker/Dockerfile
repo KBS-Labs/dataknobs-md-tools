@@ -81,8 +81,13 @@ COPY docker/.puppeteerrc.cjs /app/.puppeteerrc.cjs
 # Also copy to root for mmdc to find it
 COPY docker/.puppeteerrc.cjs /.puppeteerrc.cjs
 
-# Make scripts executable
-RUN chmod +x /app/dk-md2pdf /app/dk-fonts /app/docker-entrypoint.sh
+# Make scripts executable and entire /app directory accessible to all users
+# Also make uv's Python installation accessible (it's installed in /root/.local/share/uv)
+# (needed when running with --user on Linux)
+RUN chmod +x /app/dk-md2pdf /app/dk-fonts /app/docker-entrypoint.sh && \
+    chmod -R a+rX /app && \
+    chmod a+x /root /root/.local /root/.local/share && \
+    chmod -R a+rX /root/.local/share/uv
 
 # Add dk-fonts to PATH (via symlink in /usr/local/bin)
 RUN ln -s /app/dk-fonts /usr/local/bin/dk-fonts
