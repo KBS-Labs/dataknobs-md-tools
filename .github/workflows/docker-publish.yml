@@ -15,7 +15,6 @@ on:
       - 'bin/dk-fonts'
       - 'pyproject.toml'
       - '.python-version'
-      - '.github/workflows/docker-publish.yml'
   workflow_dispatch:
 
 env:
