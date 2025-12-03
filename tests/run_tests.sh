@@ -50,14 +50,17 @@ run_suite() {
 
 # Run Python tests if pytest is available
 run_python_tests() {
-    SUITES_RUN=$((SUITES_RUN + 1))
     echo -e "${YELLOW}Running: Python unit tests${NC}"
     echo ""
 
     cd "$PROJECT_ROOT"
 
     if command -v uv >/dev/null 2>&1; then
-        if uv run pytest tests/ -v 2>/dev/null; then
+        SUITES_RUN=$((SUITES_RUN + 1))
+        # Ensure dependencies are synced (including dev dependencies for pytest)
+        echo "Syncing dependencies with uv..."
+        uv sync --quiet --extra dev
+        if uv run pytest tests/ -v; then
             SUITES_PASSED=$((SUITES_PASSED + 1))
             echo ""
             echo -e "${GREEN}✓ Python unit tests passed${NC}"
@@ -67,6 +70,7 @@ run_python_tests() {
             echo -e "${RED}✗ Python unit tests failed${NC}"
         fi
     elif command -v pytest >/dev/null 2>&1; then
+        SUITES_RUN=$((SUITES_RUN + 1))
         if pytest tests/ -v; then
             SUITES_PASSED=$((SUITES_PASSED + 1))
             echo ""
@@ -77,8 +81,7 @@ run_python_tests() {
             echo -e "${RED}✗ Python unit tests failed${NC}"
         fi
     else
-        echo -e "${YELLOW}[SKIP]${NC} pytest not available"
-        SUITES_RUN=$((SUITES_RUN - 1))
+        echo -e "${YELLOW}[SKIP]${NC} uv and pytest not available"
     fi
     echo ""
 }
