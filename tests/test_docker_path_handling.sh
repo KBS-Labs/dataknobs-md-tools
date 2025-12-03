@@ -121,24 +121,26 @@ test_linux_user_detection() {
 test_npm_prefix_detection() {
     local test_name="npm prefix detection"
 
+    if ! command -v npm >/dev/null 2>&1; then
+        TESTS_SKIPPED=$((TESTS_SKIPPED + 1))
+        echo -e "${YELLOW}[SKIP]${NC} $test_name (npm not installed)"
+        return 0
+    fi
+
     TESTS_RUN=$((TESTS_RUN + 1))
     print_test "$test_name"
 
-    if command -v npm >/dev/null 2>&1; then
-        local prefix=$(npm config get prefix 2>/dev/null || echo "/usr/local")
+    local prefix=$(npm config get prefix 2>/dev/null || echo "/usr/local")
 
-        if [[ -n "$prefix" ]]; then
-            # Check if we can determine writability
-            local needs_sudo=false
-            if [ ! -w "$prefix/lib" ] 2>/dev/null; then
-                needs_sudo=true
-            fi
-            print_pass "$test_name (prefix=$prefix, needs_sudo=$needs_sudo)"
-        else
-            print_fail "$test_name: could not get npm prefix"
+    if [[ -n "$prefix" ]]; then
+        # Check if we can determine writability
+        local needs_sudo=false
+        if [ ! -w "$prefix/lib" ] 2>/dev/null; then
+            needs_sudo=true
         fi
+        print_pass "$test_name (prefix=$prefix, needs_sudo=$needs_sudo)"
     else
-        echo -e "${YELLOW}[SKIP]${NC} $test_name (npm not installed)"
+        print_fail "$test_name: could not get npm prefix"
     fi
 }
 
