@@ -14,61 +14,37 @@ Convert Markdown files with Mermaid diagrams to beautiful PDF and HTML documents
 - 📚 **Table of Contents** - Auto-generated TOC support
 - 🎯 **Self-Contained HTML** - Embedded images for portable documents
 
-## Quick Start
-
-### Option 1: Docker (Recommended - Single Dependency)
-
-**🐳 Docker Hub: Coming Soon!** The official Docker image will be available at `dataknobs/md-tools`.
-
-For now, build locally:
-```bash
-# Clone and build the image locally
-git clone https://github.com/KBS-Labs/dataknobs-md-tools
-cd dataknobs-md-tools
-DOCKER_BUILDKIT=1 docker build -t dataknobs/md-tools -f docker/Dockerfile .
-
-# Convert markdown to PDF
-docker run --rm -v $(pwd):/workspace dataknobs/md-tools input.md output.pdf
-
-# Convert markdown to HTML (self-contained by default)
-docker run --rm -v $(pwd):/workspace dataknobs/md-tools -f html input.md output.html
-```
-
-### Option 2: Native Installation
+## Installation
 
 ```bash
 # Clone the repository
 git clone https://github.com/KBS-Labs/dataknobs-md-tools
 cd dataknobs-md-tools
-
-# Install dependencies (installs uv, pandoc, Node.js, mermaid-cli, Python deps)
-./native/install.sh
-
-# Convert markdown to PDF
-./native/dk-md2pdf input.md output.pdf
-
-# Convert markdown to HTML (self-contained by default)
-./native/dk-md2pdf -f html input.md output.html
 ```
 
-## Installation
+### Option 1: Docker (Recommended - Single Dependency)
 
-### Docker Method
-
-Requires only Docker installed on your system:
+Docker is the easiest way to get started - it bundles all dependencies in a container.
 
 ```bash
-# Clone and build locally (Docker Hub coming soon!)
-git clone https://github.com/KBS-Labs/dataknobs-md-tools
-cd dataknobs-md-tools
-
-# Option 1: Use the build script (automatically uses buildx if available)
+# Build the Docker image (Docker Hub coming soon!)
 ./build-docker.sh
 
-# Option 2: Build manually with buildx (recommended, no deprecation warnings)
+# Convert markdown to PDF
+./bin/dk-md2pdf input.md output.pdf
+
+# Convert markdown to HTML
+./bin/dk-md2pdf -f html input.md output.html
+```
+
+The wrapper script (`bin/dk-md2pdf`) automatically uses Docker when native tools aren't installed.
+
+**Alternative build methods:**
+```bash
+# Using buildx (recommended, no deprecation warnings)
 docker buildx build -t dataknobs/md-tools -f docker/Dockerfile . --load
 
-# Option 3: Build with legacy builder (shows deprecation warning)
+# Using legacy builder
 DOCKER_BUILDKIT=1 docker build -t dataknobs/md-tools -f docker/Dockerfile .
 ```
 
@@ -82,21 +58,19 @@ DOCKER_BUILDKIT=1 docker build -t dataknobs/md-tools -f docker/Dockerfile .
   }
   ```
 
-### Native Method
+### Option 2: Native Installation (Faster Performance)
 
-Simple automated installation using `uv` for Python dependency management:
+Native installation provides better performance but requires installing dependencies on your system.
 
 ```bash
-# Clone repository
-git clone https://github.com/KBS-Labs/dataknobs-md-tools
-cd dataknobs-md-tools
-
 # Run installer (supports macOS, Linux)
-# Installs: uv, pandoc, Node.js, mermaid-cli, and Python dependencies
 ./native/install.sh
 
+# Convert markdown to PDF
+./bin/dk-md2pdf input.md output.pdf
+
 # Add to PATH (optional)
-export PATH="$PATH:$(pwd)/native"
+export PATH="$PATH:$(pwd)/bin"
 ```
 
 The installer automatically:
@@ -104,6 +78,7 @@ The installer automatically:
 - Installs **pandoc**, **Node.js**, and **mermaid-cli**
 - Installs Python 3.11.9 and **weasyprint** via `uv`
 - Handles all system dependencies for your OS
+- Uses sudo for npm global installs only when necessary
 
 #### Manual Installation
 
@@ -466,19 +441,43 @@ DOCKER_BUILDKIT=1 docker build -t dataknobs/md-tools -f docker/Dockerfile .
 docker run --rm -m 1g -v $(pwd):/workspace dataknobs/md-tools input.md
 ```
 
+**Files outside current directory:** The wrapper script (`bin/dk-md2pdf`) automatically handles mounting directories for files outside your current working directory. If using `docker run` directly, you'll need to mount each directory:
+```bash
+# Convert file from different directory
+docker run --rm \
+  -v $(pwd):/workspace \
+  -v /path/to/docs:/mnt/path/to/docs \
+  dataknobs/md-tools /mnt/path/to/docs/input.md output.pdf
+```
+
+**Linux file permission issues:** On Linux, output files may be owned by root. The wrapper script handles this automatically, but if using `docker run` directly:
+```bash
+docker run --rm --user "$(id -u):$(id -g)" -v $(pwd):/workspace dataknobs/md-tools input.md
+```
+
 ### Native Installation Issues
 
 ```bash
 # Check installed dependencies
 which pandoc mmdc weasyprint
 
-# Reinstall specific component
-npm install -g @mermaid-js/mermaid-cli
+# Reinstall specific component (may need sudo on Linux)
+sudo npm install -g @mermaid-js/mermaid-cli
 pip install --upgrade weasyprint
 
 # Use verbose mode for debugging
 dk-md2pdf -v input.md
 ```
+
+**npm permission errors on Linux:** If global npm installs fail, you can either:
+1. Re-run the installer (`./native/install.sh`) - it now detects when sudo is needed
+2. Configure npm to use a user-writable directory:
+   ```bash
+   mkdir -p ~/.npm-global
+   npm config set prefix '~/.npm-global'
+   echo 'export PATH=~/.npm-global/bin:$PATH' >> ~/.bashrc
+   source ~/.bashrc
+   ```
 
 ### Mermaid Rendering Issues
 

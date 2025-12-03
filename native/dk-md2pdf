@@ -49,6 +49,37 @@ else
     fi
 fi
 
+# Detect if running in Docker container
+IN_DOCKER=false
+if [ -f "/.dockerenv" ]; then
+    IN_DOCKER=true
+fi
+
+# Helper function to run Python with the project's dependencies
+# In Docker, use the venv directly (uv is installed as root but we run as non-root user)
+# Outside Docker, use uv run for proper environment management
+run_python() {
+    if [ "$IN_DOCKER" = true ]; then
+        # In Docker, use the venv's Python directly
+        # Check if the venv Python exists and is executable
+        if [ -x "$PROJECT_ROOT/.venv/bin/python3" ]; then
+            "$PROJECT_ROOT/.venv/bin/python3" "$@"
+        else
+            # Fall back to system Python in Docker if venv not accessible
+            python3 "$@"
+        fi
+    elif command -v uv >/dev/null 2>&1; then
+        # Outside Docker, use uv run
+        (unset VIRTUAL_ENV; cd "$PROJECT_ROOT" && uv run python3 "$@")
+    elif [ -f "$PROJECT_ROOT/.venv/bin/python3" ]; then
+        # Fall back to venv if available
+        "$PROJECT_ROOT/.venv/bin/python3" "$@"
+    else
+        # Last resort: system Python
+        python3 "$@"
+    fi
+}
+
 # Color codes for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -85,16 +116,16 @@ check_dependencies() {
         missing+=("mermaid-cli (mmdc)")
     fi
 
-    # For PDF output, check for weasyprint via uv or globally
+    # For PDF output, check for weasyprint
     if [ "$OUTPUT_FORMAT" = "pdf" ]; then
-        if command -v uv >/dev/null 2>&1; then
-            # Check if weasyprint is available via uv
-            if ! (cd "$PROJECT_ROOT" && uv run python3 -c "import weasyprint" 2>/dev/null); then
+        if ! run_python -c "import weasyprint" 2>/dev/null; then
+            if [ "$IN_DOCKER" = true ]; then
+                missing+=("weasyprint (Docker image may be corrupted)")
+            elif command -v uv >/dev/null 2>&1; then
                 missing+=("weasyprint (run: uv sync)")
+            else
+                missing+=("weasyprint")
             fi
-        elif ! command -v weasyprint >/dev/null 2>&1; then
-            # Fall back to checking for global weasyprint
-            missing+=("weasyprint")
         fi
     fi
 
@@ -259,30 +290,22 @@ done
 
 # Handle --list-fonts option (exit early)
 if [ "$LIST_FONTS" = true ]; then
-    if command -v uv >/dev/null 2>&1; then
-        cd "$PROJECT_ROOT"
-        exec uv run python3 -m python.font_manager list
-    else
-        exec python3 -m python.font_manager list
-    fi
+    run_python -m python.font_manager list
+    exit $?
 fi
 
 # Validate fonts if specified
 if [ -n "$FONT_BODY" ]; then
-    if command -v uv >/dev/null 2>&1; then
-        if ! (cd "$PROJECT_ROOT" && uv run python3 -m python.font_manager validate "$FONT_BODY" 2>&1); then
-            print_error "Invalid body font: $FONT_BODY"
-            exit 1
-        fi
+    if ! run_python -m python.font_manager validate "$FONT_BODY" 2>&1; then
+        print_error "Invalid body font: $FONT_BODY"
+        exit 1
     fi
 fi
 
 if [ -n "$FONT_CODE" ]; then
-    if command -v uv >/dev/null 2>&1; then
-        if ! (cd "$PROJECT_ROOT" && uv run python3 -m python.font_manager validate "$FONT_CODE" 2>&1); then
-            print_error "Invalid code font: $FONT_CODE"
-            exit 1
-        fi
+    if ! run_python -m python.font_manager validate "$FONT_CODE" 2>&1; then
+        print_error "Invalid code font: $FONT_CODE"
+        exit 1
     fi
 fi
 
@@ -706,9 +729,7 @@ elif [ "$OUTPUT_FORMAT" = "pdf" ]; then
 
     # Use our Python CLI module to process the HTML file
     # This handles both file-based SVGs and base64-encoded SVGs
-    # Unset VIRTUAL_ENV to avoid uv warnings about mismatched paths
-    # uv handles all module paths and virtual environment automatically
-    (unset VIRTUAL_ENV; cd "$PROJECT_ROOT" && uv run python3 -m python.process_html "$HTML_PATH")
+    run_python -m python.process_html "$HTML_PATH"
 
     # If --keep-html is set, save the HTML file
     # Note: output.html already has embedded SVGs at this point (from Python script above)
@@ -764,24 +785,11 @@ PYTHON_SCRIPT
     fi
 
     # Then use weasyprint for PDF generation
-    # Use uv if available, otherwise fall back to global weasyprint
-    if command -v uv >/dev/null 2>&1; then
-        # Unset VIRTUAL_ENV to avoid uv warnings about mismatched paths
-        unset VIRTUAL_ENV
-        if [ "$VERBOSE" = true ]; then
-            # Suppress CSS warnings about SVG attributes (they're harmless)
-            (cd "$PROJECT_ROOT" && uv run python3 -m weasyprint "$TEMP_DIR/output.html" "$OUTPUT_ABS" 2>&1 | grep -v "WARNING: Ignored")
-        else
-            (cd "$PROJECT_ROOT" && uv run python3 -m weasyprint "$TEMP_DIR/output.html" "$OUTPUT_ABS" 2>/dev/null)
-        fi
+    if [ "$VERBOSE" = true ]; then
+        # Suppress CSS warnings about SVG attributes (they're harmless)
+        run_python -m weasyprint "$TEMP_DIR/output.html" "$OUTPUT_ABS" 2>&1 | grep -v "WARNING: Ignored"
     else
-        # Fall back to global weasyprint command
-        if [ "$VERBOSE" = true ]; then
-            # Suppress CSS warnings about SVG attributes (they're harmless)
-            weasyprint "output.html" "$OUTPUT_ABS" 2>&1 | grep -v "WARNING: Ignored"
-        else
-            weasyprint "output.html" "$OUTPUT_ABS" 2>/dev/null
-        fi
+        run_python -m weasyprint "$TEMP_DIR/output.html" "$OUTPUT_ABS" 2>/dev/null
     fi
 
     cd - >/dev/null

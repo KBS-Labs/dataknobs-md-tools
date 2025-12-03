@@ -157,13 +157,34 @@ main() {
     echo -e "${CYAN}=== Installing Node.js packages ===${NC}"
     echo ""
 
+    # Determine if we need sudo for global npm installs
+    # Check if npm global prefix is user-writable
+    NPM_PREFIX=$(npm config get prefix 2>/dev/null || echo "/usr/local")
+    NPM_NEEDS_SUDO=false
+
+    if [ ! -w "$NPM_PREFIX/lib" ] 2>/dev/null; then
+        NPM_NEEDS_SUDO=true
+    fi
+
+    # Function to run npm with or without sudo
+    run_npm_global() {
+        if [ "$NPM_NEEDS_SUDO" = true ]; then
+            sudo npm "$@"
+        else
+            npm "$@"
+        fi
+    }
+
     # Install or update mermaid-cli
     if ! command_exists mmdc; then
         print_info "Installing mermaid-cli..."
-        npm install -g @mermaid-js/mermaid-cli@latest
+        if [ "$NPM_NEEDS_SUDO" = true ]; then
+            print_info "Global npm directory requires elevated privileges, using sudo..."
+        fi
+        run_npm_global install -g @mermaid-js/mermaid-cli@latest
     else
         print_info "Updating mermaid-cli..."
-        npm update -g @mermaid-js/mermaid-cli || true
+        run_npm_global update -g @mermaid-js/mermaid-cli || true
     fi
 
     echo ""
