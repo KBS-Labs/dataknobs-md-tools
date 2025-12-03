@@ -15,6 +15,7 @@ NC='\033[0m' # No Color
 TESTS_RUN=0
 TESTS_PASSED=0
 TESTS_FAILED=0
+TESTS_SKIPPED=0
 
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -97,11 +98,11 @@ test_mount_extraction() {
 test_linux_user_detection() {
     local test_name="Linux user/group detection"
 
-    TESTS_RUN=$((TESTS_RUN + 1))
-    print_test "$test_name"
-
     # Test that we can get user and group IDs on Linux
     if [[ "$OSTYPE" == "linux"* ]]; then
+        TESTS_RUN=$((TESTS_RUN + 1))
+        print_test "$test_name"
+
         local uid=$(id -u)
         local gid=$(id -g)
 
@@ -111,6 +112,7 @@ test_linux_user_detection() {
             print_fail "$test_name: could not get valid uid/gid"
         fi
     else
+        TESTS_SKIPPED=$((TESTS_SKIPPED + 1))
         echo -e "${YELLOW}[SKIP]${NC} $test_name (not running on Linux)"
     fi
 }
@@ -227,6 +229,9 @@ echo ""
 echo -e "Tests run:    $TESTS_RUN"
 echo -e "Tests passed: ${GREEN}$TESTS_PASSED${NC}"
 echo -e "Tests failed: ${RED}$TESTS_FAILED${NC}"
+if [ $TESTS_SKIPPED -gt 0 ]; then
+    echo -e "Tests skipped: ${YELLOW}$TESTS_SKIPPED${NC}"
+fi
 echo ""
 
 if [ $TESTS_FAILED -eq 0 ]; then

@@ -8,6 +8,13 @@ on:
     types: [published]
   pull_request:
     branches: [ main ]
+    paths:
+      - 'docker/**'
+      - 'src/**'
+      - 'native/dk-md2pdf'
+      - 'bin/dk-fonts'
+      - 'pyproject.toml'
+      - '.python-version'
   workflow_dispatch:
 
 env:

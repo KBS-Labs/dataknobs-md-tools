@@ -7,7 +7,47 @@ on:
     branches: [ main ]
 
 jobs:
+  # Detect which files changed to determine which jobs to run
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      docker: ${{ steps.filter.outputs.docker }}
+      native: ${{ steps.filter.outputs.native }}
+      python: ${{ steps.filter.outputs.python }}
+      tests: ${{ steps.filter.outputs.tests }}
+      examples: ${{ steps.filter.outputs.examples }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            docker:
+              - 'docker/**'
+              - 'Dockerfile'
+              - 'src/**'
+              - 'native/dk-md2pdf'
+              - 'pyproject.toml'
+              - '.python-version'
+            native:
+              - 'native/**'
+              - 'bin/**'
+              - 'src/**'
+              - 'pyproject.toml'
+              - '.python-version'
+            python:
+              - 'src/python/**'
+              - 'tests/test_*.py'
+              - 'pyproject.toml'
+              - '.python-version'
+            tests:
+              - 'tests/**'
+            examples:
+              - 'examples/**'
+
   test-native:
+    needs: changes
+    if: ${{ needs.changes.outputs.native == 'true' || needs.changes.outputs.examples == 'true' }}
     runs-on: ubuntu-latest
     name: Test Native Installation
 
@@ -61,6 +101,8 @@ jobs:
           path: /tmp/*.pdf
 
   test-docker:
+    needs: changes
+    if: ${{ needs.changes.outputs.docker == 'true' || needs.changes.outputs.examples == 'true' }}
     runs-on: ubuntu-latest
     name: Test Docker Build
 
@@ -96,6 +138,8 @@ jobs:
           path: '*-docker.*'
 
   test-wrapper:
+    needs: changes
+    if: ${{ needs.changes.outputs.docker == 'true' || needs.changes.outputs.native == 'true' || needs.changes.outputs.examples == 'true' }}
     runs-on: ubuntu-latest
     name: Test Universal Wrapper
 
@@ -116,6 +160,8 @@ jobs:
           test -f wrapper.html
 
   test-python:
+    needs: changes
+    if: ${{ needs.changes.outputs.python == 'true' || needs.changes.outputs.tests == 'true' }}
     runs-on: ubuntu-latest
     name: Test Python Unit Tests
 
@@ -150,6 +196,8 @@ jobs:
             htmlcov/
 
   validate-examples:
+    needs: changes
+    if: ${{ needs.changes.outputs.examples == 'true' }}
     runs-on: ubuntu-latest
     name: Validate Example Files
 
