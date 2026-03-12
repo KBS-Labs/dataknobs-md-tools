@@ -64,6 +64,52 @@ class TestProcessHtmlFileWithBase64:
         assert "max-width: 800px" not in result
 
 
+class TestProcessHtmlFileWithForeignObject:
+    """Tests for handling SVGs with foreignObject (htmlLabels: true).
+
+    With htmlLabels enabled, Mermaid generates foreignObject elements
+    containing XHTML for formatted labels. These must survive the full
+    HTML processing pipeline including base64 decoding and embedded SVG handling.
+    """
+
+    def _make_base64_svg(self, svg_content: str) -> str:
+        encoded = base64.b64encode(svg_content.encode("utf-8")).decode("utf-8")
+        return f'<img src="data:image/svg+xml;base64,{encoded}" alt="diagram"/>'
+
+    def test_base64_foreign_object_preserved(
+        self, sample_svg_with_foreign_object
+    ) -> None:
+        """foreignObject content must survive base64 decode + processing."""
+        img_tag = self._make_base64_svg(sample_svg_with_foreign_object)
+        html = f"<html><body>{img_tag}</body></html>"
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".html", delete=False) as f:
+            f.write(html)
+            f.flush()
+            process_html_file(f.name)
+            result = Path(f.name).read_text()
+
+        assert "<foreignObject" in result
+        assert "Line 1<br/>Line 2" in result
+        assert "<i>italic</i>" in result
+
+    def test_embedded_foreign_object_preserved(
+        self, sample_svg_with_foreign_object
+    ) -> None:
+        """foreignObject content must survive embedded SVG processing."""
+        html = f"<html><body>{sample_svg_with_foreign_object}</body></html>"
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".html", delete=False) as f:
+            f.write(html)
+            f.flush()
+            process_html_file(f.name)
+            result = Path(f.name).read_text()
+
+        assert "<foreignObject" in result
+        assert "Line 1<br/>Line 2" in result
+        assert '<div class="svg-container">' in result
+
+
 class TestProcessHtmlFileWithEmbeddedSvg:
     """Tests for Pandoc 3.x embedded SVG handling."""
 

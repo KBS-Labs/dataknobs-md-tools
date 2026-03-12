@@ -419,46 +419,26 @@ if [ "$SKIP_MERMAID" = false ] && grep -q '```mermaid' "$INPUT_FILE"; then
         echo "PUPPETEER_CONFIG: $PUPPETEER_CONFIG" >&2
     fi
 
-    # Run mermaid-cli with both configs if available (now in temp dir)
-    if [ -n "$MERMAID_CONFIG" ] && [ -n "$PUPPETEER_CONFIG" ]; then
-        if [ "$VERBOSE" = true ]; then
-            echo "Running: mmdc -i \"$INPUT_ABS\" -o \"processed.md\" $MERMAID_CONFIG $PUPPETEER_CONFIG" >&2
-            mmdc -i "$INPUT_ABS" -o "processed.md" $MERMAID_CONFIG $PUPPETEER_CONFIG || {
-                print_warning "Mermaid processing failed, continuing without diagrams"
-                cp "$INPUT_ABS" "processed.md"
-            }
-        else
-            mmdc -i "$INPUT_ABS" -o "processed.md" $MERMAID_CONFIG $PUPPETEER_CONFIG 2>/dev/null || {
-                print_warning "Mermaid processing failed, continuing without diagrams"
-                cp "$INPUT_ABS" "processed.md"
-            }
-        fi
-    elif [ -n "$MERMAID_CONFIG" ]; then
-        if [ "$VERBOSE" = true ]; then
-            echo "Running: mmdc -i \"$INPUT_ABS\" -o \"processed.md\" $MERMAID_CONFIG" >&2
-            mmdc -i "$INPUT_ABS" -o "processed.md" $MERMAID_CONFIG || {
-                print_warning "Mermaid processing failed, continuing without diagrams"
-                cp "$INPUT_ABS" "processed.md"
-            }
-        else
-            mmdc -i "$INPUT_ABS" -o "processed.md" $MERMAID_CONFIG 2>/dev/null || {
-                print_warning "Mermaid processing failed, continuing without diagrams"
-                cp "$INPUT_ABS" "processed.md"
-            }
-        fi
+    # Build mmdc command arguments
+    MMDC_ARGS=(-i "$INPUT_ABS" -o "processed.md")
+    [ -n "$MERMAID_CONFIG" ] && MMDC_ARGS+=($MERMAID_CONFIG)
+    [ -n "$PUPPETEER_CONFIG" ] && MMDC_ARGS+=($PUPPETEER_CONFIG)
+
+    # Run mermaid-cli (now in temp dir)
+    if [ "$VERBOSE" = true ]; then
+        echo "Running: mmdc ${MMDC_ARGS[*]}" >&2
+        mmdc "${MMDC_ARGS[@]}" || {
+            print_warning "Mermaid processing failed, continuing without diagrams"
+            cp "$INPUT_ABS" "processed.md"
+        }
     else
-        if [ "$VERBOSE" = true ]; then
-            echo "Running: mmdc -i \"$INPUT_ABS\" -o \"processed.md\"" >&2
-            mmdc -i "$INPUT_ABS" -o "processed.md" || {
-                print_warning "Mermaid processing failed, continuing without diagrams"
-                cp "$INPUT_ABS" "processed.md"
-            }
-        else
-            mmdc -i "$INPUT_ABS" -o "processed.md" 2>/dev/null || {
-                print_warning "Mermaid processing failed, continuing without diagrams"
-                cp "$INPUT_ABS" "processed.md"
-            }
-        fi
+        MMDC_STDERR=$(mmdc "${MMDC_ARGS[@]}" 2>&1) || {
+            print_warning "Mermaid processing failed, continuing without diagrams"
+            if [ -n "$MMDC_STDERR" ]; then
+                print_warning "mmdc output: $MMDC_STDERR"
+            fi
+            cp "$INPUT_ABS" "processed.md"
+        }
     fi
 
     # Change back to original directory

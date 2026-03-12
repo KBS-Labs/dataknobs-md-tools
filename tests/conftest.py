@@ -36,6 +36,32 @@ def sample_svg() -> str:
 
 
 @pytest.fixture
+def sample_svg_with_foreign_object() -> str:
+    """A Mermaid SVG with foreignObject elements (generated when htmlLabels: true).
+
+    This is the SVG structure Mermaid produces for labels containing HTML
+    like <br/>, <i>, <b> tags. The foreignObject wraps an XHTML div.
+    """
+    return (
+        '<svg id="my-svg" viewBox="0 0 800 600" '
+        'style="max-width: 800px; background-color: white;" '
+        'aria-roledescription="flowchart-v2" '
+        'role="graphics-document document" '
+        'xmlns="http://www.w3.org/2000/svg">'
+        "<style>#my-svg { fill: red; }</style>"
+        '<g class="node"><foreignObject width="200" height="50">'
+        '<div xmlns="http://www.w3.org/1999/xhtml">'
+        "<span>Line 1<br/>Line 2</span>"
+        "</div></foreignObject></g>"
+        '<g class="node"><foreignObject width="150" height="40">'
+        '<div xmlns="http://www.w3.org/1999/xhtml">'
+        "<span><i>italic</i> and <b>bold</b></span>"
+        "</div></foreignObject></g>"
+        "</svg>"
+    )
+
+
+@pytest.fixture
 def sample_svg_with_markers() -> str:
     """A Mermaid SVG with marker definitions and URL references."""
     return (

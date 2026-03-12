@@ -118,6 +118,60 @@ class TestNormalizeSvgSizing:
         assert 'id="my-svg"' in result
 
 
+class TestHtmlLabelsSvgProcessing:
+    """Tests for SVG processing with htmlLabels: true.
+
+    When htmlLabels is enabled in mermaid-config.json, Mermaid generates
+    <foreignObject> elements containing XHTML for labels with HTML formatting
+    (e.g., <br/>, <i>, <b>). Our processing pipeline must preserve these.
+    """
+
+    def test_foreign_object_preserved_through_cleaning(
+        self, sample_svg_with_foreign_object
+    ):
+        """foreignObject elements must survive clean_svg_attributes."""
+        result = clean_svg_attributes(sample_svg_with_foreign_object)
+        assert "<foreignObject" in result
+        assert "Line 1<br/>Line 2" in result
+        assert "<i>italic</i>" in result
+        assert "<b>bold</b>" in result
+
+    def test_foreign_object_preserved_through_id_uniquification(
+        self, sample_svg_with_foreign_object
+    ):
+        """foreignObject elements must survive make_svg_ids_unique."""
+        result = make_svg_ids_unique(sample_svg_with_foreign_object, "1")
+        assert "<foreignObject" in result
+        assert "Line 1<br/>Line 2" in result
+        assert 'id="my-svg-1"' in result
+
+    def test_foreign_object_preserved_through_sizing(
+        self, sample_svg_with_foreign_object
+    ):
+        """foreignObject elements must survive normalize_svg_sizing."""
+        result = normalize_svg_sizing(sample_svg_with_foreign_object)
+        assert "<foreignObject" in result
+        assert "Line 1<br/>Line 2" in result
+        assert "width: 100%" in result
+
+    def test_foreign_object_preserved_through_full_pipeline(
+        self, sample_svg_with_foreign_object
+    ):
+        """foreignObject elements must survive the complete process_svg_for_pdf pipeline."""
+        result = process_svg_for_pdf(sample_svg_with_foreign_object, 1)
+        assert '<div class="svg-container">' in result
+        assert "<foreignObject" in result
+        assert "Line 1<br/>Line 2" in result
+        assert "<i>italic</i>" in result
+        assert "<b>bold</b>" in result
+        # Verify aria/xml cleanup still happened
+        assert "aria-roledescription" not in result
+        # Verify ID uniquification happened
+        assert 'id="my-svg-1"' in result
+        # Verify sizing normalization happened
+        assert "width: 100%" in result
+
+
 class TestCleanSvgAttributes:
     """Tests for the clean_svg_attributes function."""
 
