@@ -343,6 +343,9 @@ All Mermaid diagram types are supported:
 - Pie charts
 - Git graphs
 - User journey maps
+- XY charts
+
+For authoring tips, known limitations, and workarounds, see the **[Mermaid Authoring Guide](docs/mermaid-authoring-guide.md)**.
 
 Example:
 
@@ -525,6 +528,8 @@ dataknobs-md-tools/
 ├── bin/                    # User-facing scripts
 │   ├── dk-md2pdf          # Main converter
 │   └── dk-md2html         # HTML converter alias
+├── docs/                  # Documentation
+│   └── mermaid-authoring-guide.md
 ├── native/                # Native installation
 │   ├── dk-md2pdf          # Core conversion script
 │   └── install.sh         # Dependency installer
@@ -532,6 +537,7 @@ dataknobs-md-tools/
 │   ├── Dockerfile         # Container definition
 │   └── docker-entrypoint.sh
 ├── src/                   # Core resources
+│   ├── python/            # Python modules
 │   ├── templates/         # HTML templates
 │   │   └── styles/        # CSS themes
 │   └── config/            # Configuration files
