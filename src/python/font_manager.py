@@ -6,11 +6,9 @@ Provides cross-platform font discovery, listing, and validation.
 Works in both native and Docker environments.
 """
 
+import re
 import subprocess
 import sys
-import re
-from typing import List, Dict, Set, Optional, Tuple
-from pathlib import Path
 
 
 class FontManager:
@@ -18,30 +16,56 @@ class FontManager:
 
     # Common font categories for filtering
     CATEGORIES = {
-        'serif': ['Times', 'Georgia', 'Palatino', 'Garamond', 'Cambria', 'Liberation Serif', 'Noto Serif', 'DejaVu Serif'],
-        'sans-serif': ['Arial', 'Helvetica', 'Verdana', 'Tahoma', 'Segoe UI', 'Liberation Sans', 'Noto Sans', 'DejaVu Sans', 'Roboto', 'Open Sans'],
-        'monospace': ['Courier', 'Monaco', 'Menlo', 'Consolas', 'Liberation Mono', 'Noto Mono', 'DejaVu Sans Mono', 'Source Code Pro', 'Fira Code', 'SF Mono'],
-        'cursive': ['Comic Sans', 'Brush Script', 'Apple Chancery'],
-        'fantasy': ['Impact', 'Papyrus']
+        "serif": [
+            "Times",
+            "Georgia",
+            "Palatino",
+            "Garamond",
+            "Cambria",
+            "Liberation Serif",
+            "Noto Serif",
+            "DejaVu Serif",
+        ],
+        "sans-serif": [
+            "Arial",
+            "Helvetica",
+            "Verdana",
+            "Tahoma",
+            "Segoe UI",
+            "Liberation Sans",
+            "Noto Sans",
+            "DejaVu Sans",
+            "Roboto",
+            "Open Sans",
+        ],
+        "monospace": [
+            "Courier",
+            "Monaco",
+            "Menlo",
+            "Consolas",
+            "Liberation Mono",
+            "Noto Mono",
+            "DejaVu Sans Mono",
+            "Source Code Pro",
+            "Fira Code",
+            "SF Mono",
+        ],
+        "cursive": ["Comic Sans", "Brush Script", "Apple Chancery"],
+        "fantasy": ["Impact", "Papyrus"],
     }
 
-    def __init__(self):
-        self._font_cache: Optional[Set[str]] = None
-        self._detailed_cache: Optional[List[Dict[str, str]]] = None
+    def __init__(self) -> None:
+        self._font_cache: set[str] | None = None
+        self._detailed_cache: list[dict[str, str]] | None = None
 
-    def _run_fc_list(self, args: List[str] = None) -> str:
+    def _run_fc_list(self, args: list[str] | None = None) -> str:
         """Run fc-list command and return output"""
-        cmd = ['fc-list']
+        cmd = ["fc-list"]
         if args:
             cmd.extend(args)
 
         try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                check=True
-            )
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
             return result.stdout
         except subprocess.CalledProcessError as e:
             print(f"Error running fc-list: {e}", file=sys.stderr)
@@ -50,46 +74,44 @@ class FontManager:
             print("Error: fc-list not found. Please install fontconfig.", file=sys.stderr)
             return ""
 
-    def get_all_fonts(self) -> Set[str]:
+    def get_all_fonts(self) -> set[str]:
         """Get set of all available font family names"""
         if self._font_cache is not None:
             return self._font_cache
 
-        output = self._run_fc_list([':','family'])
+        output = self._run_fc_list([":", "family"])
         fonts = set()
 
         for line in output.splitlines():
             # fc-list returns comma-separated family names
-            families = [f.strip() for f in line.split(',')]
+            families = [f.strip() for f in line.split(",")]
             fonts.update(families)
 
         # Filter out empty strings and sort
         self._font_cache = {f for f in fonts if f}
         return self._font_cache
 
-    def get_fonts_detailed(self) -> List[Dict[str, str]]:
+    def get_fonts_detailed(self) -> list[dict[str, str]]:
         """Get detailed font information including family, style, and file path"""
         if self._detailed_cache is not None:
             return self._detailed_cache
 
-        output = self._run_fc_list([':','family', 'style', 'file'])
+        output = self._run_fc_list([":", "family", "style", "file"])
         fonts = []
 
         for line in output.splitlines():
             # Parse fc-list output: /path/to/font.ttf: Family Name:style=Style
-            match = re.match(r'^([^:]+):\s*([^:]+):style=(.+)$', line)
+            match = re.match(r"^([^:]+):\s*([^:]+):style=(.+)$", line)
             if match:
                 file_path, family, style = match.groups()
-                fonts.append({
-                    'family': family.strip(),
-                    'style': style.strip(),
-                    'file': file_path.strip()
-                })
+                fonts.append(
+                    {"family": family.strip(), "style": style.strip(), "file": file_path.strip()}
+                )
 
-        self._detailed_cache = sorted(fonts, key=lambda x: (x['family'].lower(), x['style']))
+        self._detailed_cache = sorted(fonts, key=lambda x: (x["family"].lower(), x["style"]))
         return self._detailed_cache
 
-    def search_fonts(self, query: str, case_sensitive: bool = False) -> List[str]:
+    def search_fonts(self, query: str, case_sensitive: bool = False) -> list[str]:
         """Search for fonts matching a query string"""
         fonts = self.get_all_fonts()
 
@@ -110,7 +132,7 @@ class FontManager:
 
         return False
 
-    def find_similar_fonts(self, font_name: str, max_results: int = 5) -> List[str]:
+    def find_similar_fonts(self, font_name: str, max_results: int = 5) -> list[str]:
         """Find fonts with similar names (for suggestions)"""
         # Simple similarity: contains same words or starts with same prefix
         fonts = self.get_all_fonts()
@@ -138,7 +160,7 @@ class FontManager:
         matches.sort(key=lambda x: (-x[0], x[1].lower()))
         return [m[1] for m in matches[:max_results]]
 
-    def get_fonts_by_category(self, category: str) -> List[str]:
+    def get_fonts_by_category(self, category: str) -> list[str]:
         """Get fonts matching a specific category"""
         if category not in self.CATEGORIES:
             return []
@@ -152,7 +174,7 @@ class FontManager:
 
         return sorted(set(category_fonts))
 
-    def validate_font(self, font_name: str, suggest: bool = True) -> Tuple[bool, Optional[List[str]]]:
+    def validate_font(self, font_name: str, suggest: bool = True) -> tuple[bool, list[str] | None]:
         """
         Validate a font name and optionally return suggestions if not found
 
@@ -168,11 +190,13 @@ class FontManager:
 
         return (False, suggestions)
 
-    def list_fonts(self,
-                   category: Optional[str] = None,
-                   search: Optional[str] = None,
-                   detailed: bool = False,
-                   limit: Optional[int] = None) -> List:
+    def list_fonts(
+        self,
+        category: str | None = None,
+        search: str | None = None,
+        detailed: bool = False,
+        limit: int | None = None,
+    ) -> list[dict[str, str]] | list[str]:
         """
         List fonts with optional filtering
 
@@ -191,12 +215,15 @@ class FontManager:
             # Apply filters
             if category:
                 category_patterns = self.CATEGORIES.get(category, [])
-                fonts = [f for f in fonts
-                        if any(p.lower() in f['family'].lower() for p in category_patterns)]
+                fonts = [
+                    f
+                    for f in fonts
+                    if any(p.lower() in f["family"].lower() for p in category_patterns)
+                ]
 
             if search:
                 search_lower = search.lower()
-                fonts = [f for f in fonts if search_lower in f['family'].lower()]
+                fonts = [f for f in fonts if search_lower in f["family"].lower()]
 
             if limit:
                 fonts = fonts[:limit]
@@ -204,66 +231,79 @@ class FontManager:
             return fonts
         else:
             if category:
-                fonts = self.get_fonts_by_category(category)
+                names = self.get_fonts_by_category(category)
             elif search:
-                fonts = self.search_fonts(search)
+                names = self.search_fonts(search)
             else:
-                fonts = sorted(self.get_all_fonts())
+                names = sorted(self.get_all_fonts())
 
             if limit:
-                fonts = fonts[:limit]
+                names = names[:limit]
 
-            return list(fonts)
+            return list(names)
 
 
-def main():
+def main() -> None:
     """CLI interface for font management"""
     import argparse
 
     parser = argparse.ArgumentParser(
-        description='DataKnobs Font Manager - List and validate system fonts'
+        description="DataKnobs Font Manager - List and validate system fonts"
     )
 
-    subparsers = parser.add_subparsers(dest='command', help='Command to execute')
+    subparsers = parser.add_subparsers(dest="command", help="Command to execute")
 
     # List fonts
-    list_parser = subparsers.add_parser('list', help='List available fonts')
-    list_parser.add_argument('--category', choices=['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy'],
-                            help='Filter by font category')
-    list_parser.add_argument('--search', help='Search for fonts containing this text')
-    list_parser.add_argument('--detailed', action='store_true', help='Show detailed font information')
-    list_parser.add_argument('--limit', type=int, help='Limit number of results')
+    list_parser = subparsers.add_parser("list", help="List available fonts")
+    list_parser.add_argument(
+        "--category",
+        choices=["serif", "sans-serif", "monospace", "cursive", "fantasy"],
+        help="Filter by font category",
+    )
+    list_parser.add_argument("--search", help="Search for fonts")
+    list_parser.add_argument(
+        "--detailed",
+        action="store_true",
+        help="Show detailed font info",
+    )
+    list_parser.add_argument("--limit", type=int, help="Limit number of results")
 
     # Search fonts
-    search_parser = subparsers.add_parser('search', help='Search for fonts')
-    search_parser.add_argument('query', help='Search query')
-    search_parser.add_argument('--detailed', action='store_true', help='Show detailed font information')
+    search_parser = subparsers.add_parser("search", help="Search for fonts")
+    search_parser.add_argument("query", help="Search query")
+    search_parser.add_argument(
+        "--detailed",
+        action="store_true",
+        help="Show detailed font info",
+    )
 
     # Validate font
-    validate_parser = subparsers.add_parser('validate', help='Check if a font is available')
-    validate_parser.add_argument('font_name', help='Font name to validate')
-    validate_parser.add_argument('--no-suggest', action='store_true', help='Do not suggest alternatives')
+    validate_parser = subparsers.add_parser("validate", help="Check if a font is available")
+    validate_parser.add_argument("font_name", help="Font name to validate")
+    validate_parser.add_argument(
+        "--no-suggest",
+        action="store_true",
+        help="Do not suggest alternatives",
+    )
 
     # Categories
-    categories_parser = subparsers.add_parser('categories', help='List available font categories')
+    subparsers.add_parser("categories", help="List available font categories")
 
     args = parser.parse_args()
 
     fm = FontManager()
 
-    if args.command == 'list':
+    if args.command == "list":
         fonts = fm.list_fonts(
-            category=args.category,
-            search=args.search,
-            detailed=args.detailed,
-            limit=args.limit
+            category=args.category, search=args.search, detailed=args.detailed, limit=args.limit
         )
 
         if args.detailed:
             print(f"{'Family':<40} {'Style':<20} File")
             print("-" * 100)
-            for font in fonts:
-                print(f"{font['family']:<40} {font['style']:<20} {font['file']}")
+            for entry in fonts:
+                assert isinstance(entry, dict)
+                print(f"{entry['family']:<40} {entry['style']:<20} {entry['file']}")
         else:
             for font in fonts:
                 print(font)
@@ -271,7 +311,7 @@ def main():
         if fonts:
             print(f"\nTotal: {len(fonts)} fonts", file=sys.stderr)
 
-    elif args.command == 'search':
+    elif args.command == "search":
         fonts = fm.search_fonts(args.query)
 
         if fonts:
@@ -282,7 +322,7 @@ def main():
             print(f"No fonts found matching '{args.query}'", file=sys.stderr)
             sys.exit(1)
 
-    elif args.command == 'validate':
+    elif args.command == "validate":
         is_valid, suggestions = fm.validate_font(args.font_name, suggest=not args.no_suggest)
 
         if is_valid:
@@ -292,13 +332,13 @@ def main():
             print(f"✗ Font '{args.font_name}' not found", file=sys.stderr)
 
             if suggestions:
-                print(f"\nDid you mean one of these?", file=sys.stderr)
+                print("\nDid you mean one of these?", file=sys.stderr)
                 for suggestion in suggestions:
                     print(f"  - {suggestion}", file=sys.stderr)
 
             sys.exit(1)
 
-    elif args.command == 'categories':
+    elif args.command == "categories":
         print("Available font categories:\n")
         for category, examples in FontManager.CATEGORIES.items():
             print(f"{category}:")
@@ -309,5 +349,5 @@ def main():
         parser.print_help()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
