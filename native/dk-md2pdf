@@ -399,47 +399,29 @@ if [ "$SKIP_MERMAID" = false ] && grep -q '```mermaid' "$INPUT_FILE"; then
         cp /.puppeteerrc.cjs .puppeteerrc.cjs
     fi
 
-    # Use mermaid-cli to process diagrams with proper configuration
-    MERMAID_CONFIG=""
-    PUPPETEER_CONFIG=""
+    # Build arguments for the Python mermaid processor
+    MERMAID_PROC_ARGS=("$INPUT_ABS" "$TEMP_DIR")
 
     if [ -f "$PROJECT_ROOT/src/config/mermaid-config.json" ]; then
-        MERMAID_CONFIG="-c $PROJECT_ROOT/src/config/mermaid-config.json"
+        MERMAID_PROC_ARGS+=(--mermaid-config "$PROJECT_ROOT/src/config/mermaid-config.json")
     fi
 
-    # Use puppeteer config for both Docker and native
     if [ -f "$PROJECT_ROOT/src/config/puppeteer-config.json" ]; then
-        PUPPETEER_CONFIG="-p $PROJECT_ROOT/src/config/puppeteer-config.json"
+        MERMAID_PROC_ARGS+=(--puppeteer-config "$PROJECT_ROOT/src/config/puppeteer-config.json")
+    fi
+
+    if [ "$VERBOSE" = true ]; then
+        MERMAID_PROC_ARGS+=(--verbose)
     fi
 
     # Debug output
     if [ "$VERBOSE" = true ]; then
         echo "PROJECT_ROOT: $PROJECT_ROOT" >&2
-        echo "MERMAID_CONFIG: $MERMAID_CONFIG" >&2
-        echo "PUPPETEER_CONFIG: $PUPPETEER_CONFIG" >&2
+        echo "Running mermaid processor with args: ${MERMAID_PROC_ARGS[*]}" >&2
     fi
 
-    # Build mmdc command arguments
-    MMDC_ARGS=(-i "$INPUT_ABS" -o "processed.md")
-    [ -n "$MERMAID_CONFIG" ] && MMDC_ARGS+=($MERMAID_CONFIG)
-    [ -n "$PUPPETEER_CONFIG" ] && MMDC_ARGS+=($PUPPETEER_CONFIG)
-
-    # Run mermaid-cli (now in temp dir)
-    if [ "$VERBOSE" = true ]; then
-        echo "Running: mmdc ${MMDC_ARGS[*]}" >&2
-        mmdc "${MMDC_ARGS[@]}" || {
-            print_warning "Mermaid processing failed, continuing without diagrams"
-            cp "$INPUT_ABS" "processed.md"
-        }
-    else
-        MMDC_STDERR=$(mmdc "${MMDC_ARGS[@]}" 2>&1) || {
-            print_warning "Mermaid processing failed, continuing without diagrams"
-            if [ -n "$MMDC_STDERR" ]; then
-                print_warning "mmdc output: $MMDC_STDERR"
-            fi
-            cp "$INPUT_ABS" "processed.md"
-        }
-    fi
+    # Run the Python mermaid processor (handles per-diagram fallback)
+    run_python -m python.mermaid_processor "${MERMAID_PROC_ARGS[@]}"
 
     # Change back to original directory
     cd - >/dev/null
