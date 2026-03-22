@@ -17,8 +17,8 @@ jobs:
       tests: ${{ steps.filter.outputs.tests }}
       examples: ${{ steps.filter.outputs.examples }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d  # v4.0.1
         id: filter
         with:
           filters: |
@@ -52,10 +52,10 @@ jobs:
     name: Test Native Installation
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
         with:
           python-version: '3.11'
 
@@ -94,7 +94,7 @@ jobs:
           test -f /tmp/minimal.pdf
 
       - name: Upload test outputs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         if: always()
         with:
           name: native-test-outputs
@@ -107,31 +107,31 @@ jobs:
     name: Test Docker Build
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
       - name: Build Docker image
         run: DOCKER_BUILDKIT=1 docker build -t dataknobs/md-tools -f docker/Dockerfile .
 
       - name: Test Docker conversion
         run: |
-          docker run --rm -v $(pwd):/workspace dataknobs/md-tools \
+          docker run --rm -v "$(pwd)":/workspace dataknobs/md-tools \
             examples/basic.md basic-docker.pdf
           test -f basic-docker.pdf
 
       - name: Test Docker HTML output
         run: |
-          docker run --rm -v $(pwd):/workspace dataknobs/md-tools \
+          docker run --rm -v "$(pwd)":/workspace dataknobs/md-tools \
             -f html examples/basic.md basic-docker.html
           test -f basic-docker.html
 
       - name: Test Docker with mermaid
         run: |
-          docker run --rm -v $(pwd):/workspace dataknobs/md-tools \
+          docker run --rm -v "$(pwd)":/workspace dataknobs/md-tools \
             examples/mermaid-diagrams.md mermaid-docker.pdf
           test -f mermaid-docker.pdf
 
       - name: Upload Docker outputs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         if: always()
         with:
           name: docker-test-outputs
@@ -144,7 +144,7 @@ jobs:
     name: Test Universal Wrapper
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
       - name: Build Docker image
         run: DOCKER_BUILDKIT=1 docker build -t dataknobs/md-tools -f docker/Dockerfile .
@@ -166,10 +166,10 @@ jobs:
     name: Test Python Unit Tests
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
         with:
           python-version: '3.11'
 
@@ -187,7 +187,7 @@ jobs:
           uv run pytest tests/ -v --tb=short
 
       - name: Upload test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         if: always()
         with:
           name: pytest-results
@@ -202,7 +202,7 @@ jobs:
     name: Validate Example Files
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
       - name: Check example files exist
         run: |
