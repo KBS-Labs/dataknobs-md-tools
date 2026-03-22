@@ -1,7 +1,7 @@
-.PHONY: test lint typecheck check fix sync
+.PHONY: test lint typecheck check fix sync lint-workflows
 
-## Run all checks: lint, typecheck, test
-check: lint typecheck test
+## Run all checks: lint, typecheck, test, workflow lint
+check: lint typecheck test lint-workflows
 
 ## Run Python unit tests
 test:
@@ -19,6 +19,10 @@ typecheck:
 fix:
 	uv run ruff check --fix src/python/ tests/
 	uv run ruff format src/python/ tests/
+
+## Lint GitHub Actions workflow files
+lint-workflows:
+	bin/lint-workflows.sh
 
 ## Install/sync all dependencies including dev
 sync:
