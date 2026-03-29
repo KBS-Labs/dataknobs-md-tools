@@ -112,8 +112,8 @@ jobs:
           mkdir -p dist
 
           # Create a self-contained installation script
-          # Note: VERSION is baked into the script at build time via envsubst
-          envsubst '$VERSION' << 'INSTALLER_EOF' > "dist/install-dk-md-tools-${PLATFORM}.sh"
+          # Note: VERSION is baked into the script at build time via sed
+          sed "s|\${VERSION}|${VERSION}|g" << 'INSTALLER_EOF' > "dist/install-dk-md-tools-${PLATFORM}.sh"
           #!/bin/bash
           set -e
 
