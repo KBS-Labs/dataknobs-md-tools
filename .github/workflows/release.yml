@@ -17,16 +17,26 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
-      - name: Create release archive
+      - name: Validate tag format
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}
         run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          tar -czf dataknobs-md-tools-${VERSION}.tar.gz \
+          if ! echo "$GITHUB_REF_NAME" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$'; then
+            echo "ERROR: Tag '$GITHUB_REF_NAME' does not match expected format vX.Y.Z"
+            exit 1
+          fi
+
+      - name: Create release archive
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          tar -czf "dataknobs-md-tools-${VERSION}.tar.gz" \
             --exclude='.git' \
             --exclude='.github' \
             --exclude='*.pdf' \
             --exclude='*.html' \
             .
-          zip -r dataknobs-md-tools-${VERSION}.zip . \
+          zip -r "dataknobs-md-tools-${VERSION}.zip" . \
             -x '.git/*' \
             -x '.github/*' \
             -x '*.pdf' \
@@ -34,8 +44,9 @@ jobs:
 
       - name: Generate release notes
         id: release_notes
+        env:
+          VERSION: ${{ github.ref_name }}
         run: |
-          VERSION=${GITHUB_REF#refs/tags/}
           cat << EOF > release_notes.md
           # DataKnobs Markdown Tools ${VERSION}
 
@@ -94,12 +105,15 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
       - name: Create standalone script
+        env:
+          VERSION: ${{ github.ref_name }}
+          PLATFORM: ${{ matrix.platform }}
         run: |
-          VERSION=${GITHUB_REF#refs/tags/}
           mkdir -p dist
 
           # Create a self-contained installation script
-          cat << 'EOF' > dist/install-dk-md-tools-${{ matrix.platform }}.sh
+          # Note: VERSION is baked into the script at build time via envsubst
+          envsubst '$VERSION' << 'INSTALLER_EOF' > "dist/install-dk-md-tools-${PLATFORM}.sh"
           #!/bin/bash
           set -e
 
@@ -113,7 +127,7 @@ jobs:
 
           # Download and extract
           echo "Downloading DataKnobs MD Tools..."
-          curl -L https://github.com/KBS-Labs/dataknobs-md-tools/archive/refs/tags/${VERSION}.tar.gz | tar xz -C "$INSTALL_DIR" --strip-components=1
+          curl --fail --max-time 120 -L "https://github.com/KBS-Labs/dataknobs-md-tools/archive/refs/tags/${VERSION}.tar.gz" | tar xz -C "$INSTALL_DIR" --strip-components=1
 
           # Run native installer
           echo "Installing dependencies..."
@@ -128,9 +142,9 @@ jobs:
           echo "  export PATH=\"\$PATH:$INSTALL_DIR/bin\""
           echo ""
           echo "Or add the above line to your ~/.bashrc or ~/.zshrc"
-          EOF
+          INSTALLER_EOF
 
-          chmod +x dist/install-dk-md-tools-${{ matrix.platform }}.sh
+          chmod +x "dist/install-dk-md-tools-${PLATFORM}.sh"
 
       - name: Upload installer
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4

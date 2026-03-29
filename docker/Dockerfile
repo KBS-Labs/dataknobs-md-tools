@@ -43,20 +43,21 @@ RUN ARCH=$(dpkg --print-architecture) && \
     && rm pandoc-${PANDOC_VERSION}-1-${ARCH}.deb
 
 # Install uv for Python package management
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+# Version pinning: specific version for reproducible builds
+ENV UV_VERSION=0.7.8
+RUN curl --fail --max-time 60 -LsSf "https://astral.sh/uv/${UV_VERSION}/install.sh" | sh
 ENV PATH="/root/.local/bin:$PATH"
 
 # Set environment for Puppeteer/Chromium
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
-# Update npm to latest version first
-RUN npm install -g npm@latest
+# Update npm to pinned version for reproducible builds
+RUN npm install -g npm@11.12.1
 
 # Install mermaid-cli globally
-# Version pinning: Using @latest to stay current with Mermaid diagram features
-# The deprecation warning doesn't affect functionality
-RUN npm install -g @mermaid-js/mermaid-cli@latest
+# Version pinning: pinned for reproducible builds and supply chain safety
+RUN npm install -g @mermaid-js/mermaid-cli@11.12.0
 
 # Create app directory
 WORKDIR /app
