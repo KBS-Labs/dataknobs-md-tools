@@ -52,11 +52,9 @@ ENV PATH="/root/.local/bin:$PATH"
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
-# Update npm to pinned version for reproducible builds
-RUN npm install -g npm@11.12.1
-
 # Install mermaid-cli globally
 # Version pinning: pinned for reproducible builds and supply chain safety
+# Uses the npm bundled with node:22-slim (no self-upgrade needed)
 RUN npm install -g @mermaid-js/mermaid-cli@11.12.0
 
 # Create app directory
