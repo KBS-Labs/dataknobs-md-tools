@@ -79,7 +79,7 @@ jobs:
           EOF
 
       - name: Create Release
-        uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe  # v2
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda  # v2
         with:
           body_path: release_notes.md
           files: |
@@ -147,7 +147,7 @@ jobs:
           chmod +x "dist/install-dk-md-tools-${PLATFORM}.sh"
 
       - name: Upload installer
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f  # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: installer-${{ matrix.platform }}
           path: dist/install-dk-md-tools-${{ matrix.platform }}.sh
@@ -164,6 +164,6 @@ jobs:
           path: installers
 
       - name: Attach to release
-        uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe  # v2
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda  # v2
         with:
           files: installers/**/*.sh
